@@ -102,7 +102,10 @@ export async function syncCalendar(
 ): Promise<SyncResult> {
   const proxyUrl = `/api/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`
   const response = await fetch(proxyUrl)
-  if (!response.ok) throw new Error('Impossible de récupérer le calendrier')
+  if (!response.ok) {
+    const detail = await response.text()
+    throw new Error(`Erreur proxy (${response.status}) : ${detail}`)
+  }
 
   const icsText = await response.text()
   const events = parseICS(icsText)
