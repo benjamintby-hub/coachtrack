@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useDashboard } from '@/hooks/useDashboard'
 import { usePaiements } from '@/hooks/usePaiements'
+import { useCalendarSync } from '@/hooks/useCalendarSync'
 import ClientBadge from '@/components/ClientBadge'
 import PaymentBadge from '@/components/PaymentBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
@@ -13,8 +14,11 @@ export default function Dashboard() {
   const [mois, setMois] = useState(now.getMonth() + 1)
   const [annee, setAnnee] = useState(now.getFullYear())
   const [refreshKey, setRefreshKey] = useState(0)
+  const [showCalendarModal, setShowCalendarModal] = useState(false)
+  const [calendarInput, setCalendarInput] = useState('')
   const { stats, seancesRecentes, loading } = useDashboard(mois, annee, refreshKey)
   const { paiements, updatePaiementStatut: _updatePaiementStatut } = usePaiements()
+  const { calendarUrl, saveUrl, sync, syncing, result, error: syncError } = useCalendarSync()
 
   const updatePaiementStatut = async (id: string, statut: PaymentStatus) => {
     await _updatePaiementStatut(id, statut)
@@ -37,6 +41,12 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
         <div className="flex gap-2">
+          <button
+            onClick={() => { setCalendarInput(calendarUrl); setShowCalendarModal(true) }}
+            className="border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:border-gray-300 transition-colors"
+          >
+            📅 Calendrier
+          </button>
           <select
             value={mois}
             onChange={e => setMois(Number(e.target.value))}
@@ -129,6 +139,66 @@ export default function Dashboard() {
             )}
           </div>
         </>
+      )}
+
+      {/* Modal calendrier */}
+      {showCalendarModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-900">Synchronisation Apple Calendar</h2>
+              <button onClick={() => setShowCalendarModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+            </div>
+            <div className="px-6 py-4 flex flex-col gap-4">
+              <p className="text-sm text-gray-600">
+                Colle ici l'URL de ton calendrier iCloud public. Les événements nommés <code className="bg-gray-100 px-1 rounded text-xs">[NOM Prénom]</code> seront automatiquement importés.
+              </p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">URL du calendrier (webcal://...)</label>
+                <input
+                  type="text"
+                  value={calendarInput}
+                  onChange={e => setCalendarInput(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="webcal://p-cal.icloud.com/published/..."
+                />
+              </div>
+
+              {syncError && <p className="text-red-500 text-sm">{syncError}</p>}
+
+              {result && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
+                  <p className="font-medium text-green-700">Synchronisation terminée</p>
+                  <p className="text-green-600">{result.imported} séance{result.imported > 1 ? 's' : ''} importée{result.imported > 1 ? 's' : ''}</p>
+                  <p className="text-gray-500">{result.skipped} déjà présente{result.skipped > 1 ? 's' : ''}</p>
+                  {result.unmatched.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-orange-600 font-medium">Événements non reconnus ({result.unmatched.length}) :</p>
+                      {result.unmatched.map((u, i) => <p key={i} className="text-gray-500 text-xs">— {u}</p>)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setShowCalendarModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
+                  Fermer
+                </button>
+                <button
+                  onClick={async () => {
+                    saveUrl(calendarInput)
+                    await sync(calendarInput)
+                    setRefreshKey(k => k + 1)
+                  }}
+                  disabled={syncing || !calendarInput}
+                  className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {syncing ? 'Synchronisation...' : 'Synchroniser'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
