@@ -6,6 +6,7 @@ const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov
 export interface StatsData {
   ca12mois: { mois: string; salle: number; particulier: number; total: number }[]
   topClients: { nom: string; ca: number; nbSeances: number }[]
+  annulationsParClient: { nom: string; done: number; annulees: number; taux: number }[]
   repartition: { name: string; value: number; color: string }[]
   tauxAnnulation: number
   delaiMoyenPaiement: number
@@ -16,6 +17,7 @@ export function useStats(annee: number) {
   const [stats, setStats] = useState<StatsData>({
     ca12mois: [],
     topClients: [],
+    annulationsParClient: [],
     repartition: [],
     tauxAnnulation: 0,
     delaiMoyenPaiement: 0,
@@ -70,10 +72,28 @@ export function useStats(annee: number) {
         { name: 'Particuliers', value: Math.round(totalParticulier), color: '#10b981' },
       ]
 
-      // Taux annulation
+      // Taux annulation global
       const done = seances.filter(s => s.statut_seance === 'done').length
       const annulees = seances.filter(s => s.statut_seance === 'cancelled_client').length
       const tauxAnnulation = done + annulees > 0 ? Math.round((annulees / (done + annulees)) * 100) : 0
+
+      // Taux annulation par client
+      const annulMap: Record<string, { nom: string; done: number; annulees: number }> = {}
+      for (const s of seances) {
+        if (s.statut_seance !== 'done' && s.statut_seance !== 'cancelled_client') continue
+        const key = s.client_id
+        const nom = `${s.clients?.prenom} ${s.clients?.nom}`
+        if (!annulMap[key]) annulMap[key] = { nom, done: 0, annulees: 0 }
+        if (s.statut_seance === 'done') annulMap[key].done++
+        else annulMap[key].annulees++
+      }
+      const annulationsParClient = Object.values(annulMap)
+        .map(c => ({
+          ...c,
+          taux: Math.round((c.annulees / (c.done + c.annulees)) * 100),
+        }))
+        .filter(c => c.annulees > 0)
+        .sort((a, b) => b.taux - a.taux)
 
       // Délai moyen paiement (jours entre date séance et date_paiement)
       const delais: number[] = []
@@ -88,7 +108,7 @@ export function useStats(annee: number) {
 
       const totalAnnee = ca12mois.reduce((acc, m) => acc + m.total, 0)
 
-      setStats({ ca12mois, topClients, repartition, tauxAnnulation, delaiMoyenPaiement, totalAnnee })
+      setStats({ ca12mois, topClients, annulationsParClient, repartition, tauxAnnulation, delaiMoyenPaiement, totalAnnee })
       setLoading(false)
     }
 

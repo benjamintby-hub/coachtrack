@@ -64,6 +64,35 @@ export default function Stats() {
             </ResponsiveContainer>
           </div>
 
+          {/* Taux annulation par client */}
+          {stats.annulationsParClient.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h2 className="font-semibold text-gray-900">Annulations par client</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Uniquement les clients ayant au moins une annulation</p>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {stats.annulationsParClient.map((c, i) => (
+                  <div key={i} className="flex items-center gap-4 px-5 py-3">
+                    <span className="flex-1 text-sm font-medium text-gray-800">{c.nom}</span>
+                    <span className="text-sm text-gray-400">{c.annulees} annulation{c.annulees > 1 ? 's' : ''} / {c.done + c.annulees} séances</span>
+                    <div className="w-24 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${c.taux >= 30 ? 'bg-red-400' : c.taux >= 15 ? 'bg-orange-400' : 'bg-yellow-400'}`}
+                          style={{ width: `${c.taux}%` }}
+                        />
+                      </div>
+                      <span className={`text-sm font-semibold w-9 text-right ${c.taux >= 30 ? 'text-red-500' : c.taux >= 15 ? 'text-orange-500' : 'text-yellow-600'}`}>
+                        {c.taux}%
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             {/* Camembert répartition */}
             <div className="bg-white border border-gray-200 rounded-xl p-5">
