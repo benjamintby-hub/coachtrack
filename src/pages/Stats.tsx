@@ -56,7 +56,7 @@ export default function Stats() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="mois" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={v => `${v}€`} />
-                <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                 <Legend />
                 <Bar dataKey="salle" name="Salle" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="particulier" name="Particuliers" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -110,14 +110,14 @@ export default function Stats() {
                       outerRadius={80}
                       paddingAngle={3}
                       dataKey="value"
-                      label={({ name, percent }) => `${name} ${Math.round(percent * 100)}%`}
+                      label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
                       labelLine={false}
                     >
                       {stats.repartition.map((entry, i) => (
                         <Cell key={i} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => formatCurrency(v)} />
+                    <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                   </PieChart>
                 </ResponsiveContainer>
               )}
