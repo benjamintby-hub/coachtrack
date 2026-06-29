@@ -5,6 +5,7 @@ import Dashboard from '@/pages/Dashboard'
 import Clients from '@/pages/Clients'
 import Seances from '@/pages/Seances'
 import Compta from '@/pages/Compta'
+import Stats from '@/pages/Stats'
 import Login from '@/pages/Login'
 
 export default function App() {
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/clients" element={<Clients />} />
             <Route path="/seances" element={<Seances />} />
             <Route path="/compta" element={<Compta />} />
+            <Route path="/stats" element={<Stats />} />
           </Route>
         </Route>
       </Routes>
