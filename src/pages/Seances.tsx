@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useSeances } from '@/hooks/useSeances'
 import { useClients } from '@/hooks/useClients'
 import { usePaiements } from '@/hooks/usePaiements'
-import SeanceForm from '@/components/SeanceForm'
+import SeanceForm, { type SeanceFormData } from '@/components/SeanceForm'
 import ClientBadge from '@/components/ClientBadge'
 import PaymentBadge from '@/components/PaymentBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import type { Seance, ClientType } from '@/types'
+
+const modeLabels: Record<string, string> = { cash: 'Espèces', transfer: 'Virement' }
 
 type Filter = 'tous' | ClientType
 
@@ -20,7 +22,7 @@ const statutSeanceLabels: Record<string, string> = {
 export default function Seances() {
   const { seances, loading, error, createSeance, updateSeance, deleteSeance } = useSeances()
   const { clients } = useClients()
-  const { paiements, updatePaiementStatut } = usePaiements()
+  const { paiements, updatePaiementStatut, updatePaiementMode } = usePaiements()
   const [filter, setFilter] = useState<Filter>('tous')
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState<any | null>(null)
@@ -28,14 +30,20 @@ export default function Seances() {
 
   const filtered = seances.filter(s => filter === 'tous' || s.type === filter)
 
-  const handleCreate = async (data: Omit<Seance, 'id' | 'created_at'>) => {
-    await createSeance(data)
+  const handleCreate = async (data: SeanceFormData) => {
+    const { moyen_paiement, ...seanceData } = data
+    await createSeance(seanceData, moyen_paiement)
     setShowForm(false)
   }
 
-  const handleUpdate = async (data: Omit<Seance, 'id' | 'created_at'>) => {
+  const handleUpdate = async (data: SeanceFormData) => {
     if (!editing) return
-    await updateSeance(editing.id, data)
+    const { moyen_paiement, ...seanceData } = data
+    await updateSeance(editing.id, seanceData)
+    if (moyen_paiement !== undefined) {
+      const paiement = paiements.find(p => p.seance_id === editing.id)
+      if (paiement) await updatePaiementMode(paiement.id, moyen_paiement)
+    }
     setEditing(null)
   }
 
@@ -101,6 +109,11 @@ export default function Seances() {
               </div>
               <div className="flex items-center gap-3 shrink-0">
                 <span className="text-sm font-medium text-gray-700">{formatCurrency(seance.tarif)}</span>
+                {paiement?.mode && (
+                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                    {modeLabels[paiement.mode] ?? paiement.mode}
+                  </span>
+                )}
                 {paiement && (
                   <select
                     value={paiement.statut}
@@ -162,7 +175,13 @@ export default function Seances() {
       {/* Modal édition */}
       {editing && (
         <Modal title="Modifier la séance" onClose={() => setEditing(null)}>
-          <SeanceForm clients={clients} initial={editing} onSubmit={handleUpdate} onCancel={() => setEditing(null)} />
+          <SeanceForm
+            clients={clients}
+            initial={editing}
+            initialMoyenPaiement={paiements.find(p => p.seance_id === editing.id)?.mode}
+            onSubmit={handleUpdate}
+            onCancel={() => setEditing(null)}
+          />
         </Modal>
       )}
     </div>

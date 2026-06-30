@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import type { Client, Seance, SeanceStatus } from '@/types'
 
+export type SeanceFormData = Omit<Seance, 'id' | 'created_at'> & { moyen_paiement?: string }
+
 interface Props {
   clients: Client[]
   initial?: Partial<Seance>
-  onSubmit: (data: Omit<Seance, 'id' | 'created_at'>) => Promise<void>
+  initialMoyenPaiement?: string
+  onSubmit: (data: SeanceFormData) => Promise<void>
   onCancel: () => void
 }
 
@@ -15,7 +18,7 @@ const statutLabels: Record<SeanceStatus, string> = {
   postponed: 'Reportée',
 }
 
-export default function SeanceForm({ clients, initial, onSubmit, onCancel }: Props) {
+export default function SeanceForm({ clients, initial, initialMoyenPaiement, onSubmit, onCancel }: Props) {
   const today = new Date().toISOString().split('T')[0]
   const [form, setForm] = useState({
     client_id: initial?.client_id ?? '',
@@ -26,6 +29,7 @@ export default function SeanceForm({ clients, initial, onSubmit, onCancel }: Pro
     statut_seance: (initial?.statut_seance ?? 'done') as SeanceStatus,
     type: initial?.type ?? 'particulier' as const,
     notes: initial?.notes ?? '',
+    moyen_paiement: initialMoyenPaiement ?? '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -56,6 +60,7 @@ export default function SeanceForm({ clients, initial, onSubmit, onCancel }: Pro
         statut_seance: form.statut_seance,
         type: form.type,
         notes: form.notes || undefined,
+        moyen_paiement: form.moyen_paiement || undefined,
       })
     } catch {
       setError('Une erreur est survenue.')
@@ -106,6 +111,14 @@ export default function SeanceForm({ clients, initial, onSubmit, onCancel }: Pro
           {Object.entries(statutLabels).map(([key, label]) => (
             <option key={key} value={key}>{label}</option>
           ))}
+        </select>
+      ))}
+
+      {field('Moyen de paiement', (
+        <select className={inputClass} value={form.moyen_paiement} onChange={e => setForm(f => ({ ...f, moyen_paiement: e.target.value }))}>
+          <option value="">— Non précisé —</option>
+          <option value="cash">Espèces</option>
+          <option value="transfer">Virement</option>
         </select>
       ))}
 

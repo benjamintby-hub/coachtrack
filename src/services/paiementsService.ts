@@ -42,4 +42,15 @@ export const paiementsService = {
     if (error) throw error
     return data as Paiement
   },
+
+  async updateMode(id: string, mode: string) {
+    const { data, error } = await supabase
+      .from('paiements')
+      .update({ mode })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data as Paiement
+  },
 }

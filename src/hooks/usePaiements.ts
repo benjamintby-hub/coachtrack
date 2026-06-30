@@ -18,5 +18,10 @@ export function usePaiements() {
     setPaiements(prev => prev.map(p => p.id === id ? updated : p))
   }
 
-  return { paiements, updatePaiementStatut, reload: load }
+  const updatePaiementMode = async (id: string, mode: string) => {
+    const updated = await paiementsService.updateMode(id, mode)
+    setPaiements(prev => prev.map(p => p.id === id ? updated : p))
+  }
+
+  return { paiements, updatePaiementStatut, updatePaiementMode, reload: load }
 }

@@ -22,14 +22,14 @@ export function useSeances() {
 
   useEffect(() => { load() }, [])
 
-  const createSeance = async (seance: Omit<Seance, 'id' | 'created_at'>) => {
+  const createSeance = async (seance: Omit<Seance, 'id' | 'created_at'>, moyenPaiement?: string) => {
     const newSeance = await seancesService.create(seance)
-    // Créer automatiquement le paiement associé
     await paiementsService.create({
       seance_id: newSeance.id,
       montant_du: seance.tarif,
       montant_paye: 0,
       statut: seance.statut_seance === 'done' ? 'pending' : 'cancelled',
+      mode: moyenPaiement as any || undefined,
     })
     await load()
     return newSeance
