@@ -71,7 +71,7 @@ export default function Dashboard() {
       ) : (
         <>
           {/* KPIs */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
             <KPI
               label="CA encaissé"
               value={formatCurrency(stats.caEncaisse)}
@@ -85,12 +85,6 @@ export default function Dashboard() {
             <KPI
               label="Séances"
               value={String(stats.nbSeances)}
-              sub={`${stats.nbSeancesSalle} salle · ${stats.nbSeancesParticulier} particulier`}
-            />
-            <KPI
-              label="Salle vs Particulier"
-              value={formatCurrency(stats.caEncaisseSalle)}
-              sub={`Particulier : ${formatCurrency(stats.caEncaisseParticulier)}`}
             />
           </div>
 
