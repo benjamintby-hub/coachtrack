@@ -27,8 +27,18 @@ export interface Seance {
   tarif: number
   statut_seance: SeanceStatus
   uid_calendrier?: string
+  forfait_id?: string
   type: ClientType
   notes?: string
+  created_at: string
+}
+
+export interface Forfait {
+  id: string
+  client_id: string
+  nb_seances: number
+  prix_total?: number
+  date_achat: string
   created_at: string
 }
 
