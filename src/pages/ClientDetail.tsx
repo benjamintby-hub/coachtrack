@@ -27,12 +27,22 @@ export default function ClientDetail() {
   const load = async () => {
     if (!id) return
     setLoading(true)
-    const [clientData, seancesData] = await Promise.all([
+    const [clientData, seancesRaw] = await Promise.all([
       clientsService.getById(id),
       seancesService.getByClient(id),
     ])
     setClient(clientData)
-    setSeances(seancesData ?? [])
+
+    // Paiements récupérés séparément pour s'assurer de tous les avoir
+    const ids = (seancesRaw ?? []).map((s: any) => s.id)
+    let pMap: Record<string, any> = {}
+    if (ids.length > 0) {
+      const { data: paiementsRaw } = await import('@/lib/supabase').then(({ supabase }) =>
+        supabase.from('paiements').select('*').in('seance_id', ids)
+      )
+      for (const p of paiementsRaw ?? []) pMap[p.seance_id] = p
+    }
+    setSeances((seancesRaw ?? []).map((s: any) => ({ ...s, paiements: pMap[s.id] ? [pMap[s.id]] : [] })))
     setLoading(false)
   }
 

@@ -4,13 +4,15 @@ import { supabase } from '@/lib/supabase'
 const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
 
 export interface StatsData {
-  ca12mois: { mois: string; salle: number; particulier: number; total: number }[]
+  ca12mois: { mois: string; cash: number; transfer: number; total: number }[]
   topClients: { nom: string; ca: number; nbSeances: number }[]
   annulationsParClient: { nom: string; done: number; annulees: number; taux: number }[]
   repartition: { name: string; value: number; color: string }[]
   tauxAnnulation: number
   delaiMoyenPaiement: number
   totalAnnee: number
+  totalCash: number
+  totalTransfer: number
 }
 
 export function useStats(annee: number) {
@@ -22,6 +24,8 @@ export function useStats(annee: number) {
     tauxAnnulation: 0,
     delaiMoyenPaiement: 0,
     totalAnnee: 0,
+    totalCash: 0,
+    totalTransfer: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -32,21 +36,33 @@ export function useStats(annee: number) {
       const debut = `${annee}-01-01`
       const fin = `${annee}-12-31`
 
-      const { data: seances } = await supabase
+      const { data: seancesRaw } = await supabase
         .from('seances')
-        .select('*, paiements(*), clients(nom, prenom)')
+        .select('*, clients(nom, prenom)')
         .gte('date', debut)
         .lte('date', fin)
 
-      if (!seances) { setLoading(false); return }
+      if (!seancesRaw) { setLoading(false); return }
+
+      // Paiements récupérés séparément pour éviter les problèmes de join RLS
+      const { data: paiementsRaw } = await supabase
+        .from('paiements')
+        .select('*')
+        .in('seance_id', seancesRaw.map(s => s.id))
+
+      const pMap: Record<string, any> = {}
+      for (const p of paiementsRaw ?? []) pMap[p.seance_id] = p
+
+      const seances = seancesRaw.map(s => ({ ...s, paiement: pMap[s.id] ?? null }))
 
       // CA par mois
       const ca12mois = MOIS.map((mois, i) => {
         const m = String(i + 1).padStart(2, '0')
         const duMois = seances.filter(s => s.date.startsWith(`${annee}-${m}`) && s.statut_seance === 'done')
-        const salle = duMois.filter(s => s.type === 'salle').reduce((acc, s) => acc + (s.paiements?.[0]?.montant_paye ?? 0), 0)
-        const particulier = duMois.filter(s => s.type === 'particulier').reduce((acc, s) => acc + (s.paiements?.[0]?.montant_paye ?? 0), 0)
-        return { mois, salle, particulier, total: salle + particulier }
+        const cash = duMois.filter(s => s.paiement?.mode === 'cash').reduce((acc, s) => acc + (s.paiement?.montant_paye ?? 0), 0)
+        const transfer = duMois.filter(s => s.paiement?.mode === 'transfer').reduce((acc, s) => acc + (s.paiement?.montant_paye ?? 0), 0)
+        const total = duMois.reduce((acc, s) => acc + (s.paiement?.montant_paye ?? 0), 0)
+        return { mois, cash, transfer, total }
       })
 
       // Top clients
@@ -55,7 +71,7 @@ export function useStats(annee: number) {
         if (s.statut_seance !== 'done') continue
         const key = s.client_id
         const nom = `${s.clients?.prenom} ${s.clients?.nom}`
-        const montant = s.paiements?.[0]?.montant_paye ?? 0
+        const montant = s.paiement?.montant_paye ?? 0
         if (!clientMap[key]) clientMap[key] = { nom, ca: 0, nbSeances: 0 }
         clientMap[key].ca += montant
         clientMap[key].nbSeances++
@@ -64,12 +80,12 @@ export function useStats(annee: number) {
         .sort((a, b) => b.ca - a.ca)
         .slice(0, 5)
 
-      // Répartition salle/particulier
-      const totalSalle = ca12mois.reduce((acc, m) => acc + m.salle, 0)
-      const totalParticulier = ca12mois.reduce((acc, m) => acc + m.particulier, 0)
+      // Répartition espèces/virement
+      const totalCash = ca12mois.reduce((acc, m) => acc + m.cash, 0)
+      const totalTransfer = ca12mois.reduce((acc, m) => acc + m.transfer, 0)
       const repartition = [
-        { name: 'Salle', value: Math.round(totalSalle), color: '#3b82f6' },
-        { name: 'Particuliers', value: Math.round(totalParticulier), color: '#10b981' },
+        { name: 'Espèces', value: Math.round(totalCash), color: '#10b981' },
+        { name: 'Virement', value: Math.round(totalTransfer), color: '#3b82f6' },
       ]
 
       // Taux annulation global
@@ -98,7 +114,7 @@ export function useStats(annee: number) {
       // Délai moyen paiement (jours entre date séance et date_paiement)
       const delais: number[] = []
       for (const s of seances) {
-        const p = s.paiements?.[0]
+        const p = s.paiement
         if (p?.statut === 'paid' && p?.date_paiement) {
           const diff = (new Date(p.date_paiement).getTime() - new Date(s.date).getTime()) / 86400000
           if (diff >= 0 && diff < 365) delais.push(diff)
@@ -108,7 +124,7 @@ export function useStats(annee: number) {
 
       const totalAnnee = ca12mois.reduce((acc, m) => acc + m.total, 0)
 
-      setStats({ ca12mois, topClients, annulationsParClient, repartition, tauxAnnulation, delaiMoyenPaiement, totalAnnee })
+      setStats({ ca12mois, topClients, annulationsParClient, repartition, tauxAnnulation, delaiMoyenPaiement, totalAnnee, totalCash, totalTransfer })
       setLoading(false)
     }
 

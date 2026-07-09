@@ -43,8 +43,8 @@ export default function Stats() {
           {/* KPIs annuels */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <KPI label="CA annuel" value={formatCurrency(stats.totalAnnee)} sub="Encaissé" />
-            <KPI label="Salle" value={formatCurrency(stats.repartition[0]?.value ?? 0)} />
-            <KPI label="Particuliers" value={formatCurrency(stats.repartition[1]?.value ?? 0)} />
+            <KPI label="Espèces" value={formatCurrency(stats.totalCash)} />
+            <KPI label="Virement" value={formatCurrency(stats.totalTransfer)} />
             <KPI label="Taux annulation" value={`${stats.tauxAnnulation}%`} sub={`Délai paiement : ${stats.delaiMoyenPaiement}j`} />
           </div>
 
@@ -58,8 +58,8 @@ export default function Stats() {
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={v => `${v}€`} />
                 <Tooltip formatter={(v) => formatCurrency(Number(v))} />
                 <Legend />
-                <Bar dataKey="salle" name="Salle" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="particulier" name="Particuliers" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="cash" name="Espèces" fill="#10b981" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="transfer" name="Virement" fill="#3b82f6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
