@@ -10,13 +10,6 @@ import PaymentBadge from '@/components/PaymentBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import type { Client, PaymentStatus } from '@/types'
 
-const statutLabels: Record<string, string> = {
-  done: 'Réalisée',
-  cancelled_client: 'Annulée (client)',
-  cancelled_coach: 'Annulée (coach)',
-  postponed: 'Reportée',
-}
-
 const modeLabels: Record<string, string> = { cash: 'Espèces', transfer: 'Virement' }
 
 export default function ClientDetail() {
@@ -189,14 +182,19 @@ export default function ClientDetail() {
                 <div key={seance.id} className="flex items-center gap-3 px-5 py-3 flex-wrap">
                   <span className="text-sm text-gray-400 w-20 shrink-0">{formatDate(seance.date)}</span>
                   <div className="flex-1 min-w-0">
-                    <span className="text-xs text-gray-500">{statutLabels[seance.statut_seance]}</span>
                     {seance.notes && <p className="text-xs text-gray-400 truncate">{seance.notes}</p>}
                   </div>
                   <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>
-                  {paiement?.mode && (
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
-                      {modeLabels[paiement.mode] ?? paiement.mode}
-                    </span>
+                  {paiement && (
+                    <select
+                      value={paiement.mode ?? ''}
+                      onChange={e => paiementsService.updateMode(paiement.id, e.target.value).then(load)}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shrink-0"
+                    >
+                      <option value="">— Mode —</option>
+                      <option value="cash">Espèces</option>
+                      <option value="transfer">Virement</option>
+                    </select>
                   )}
                   {paiement && (
                     <select
