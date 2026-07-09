@@ -78,9 +78,9 @@ export default function Dashboard() {
               sub={`À déclarer BNC`}
             />
             <KPI
-              label="En attente"
-              value={formatCurrency(stats.enAttente)}
-              sub={`${stats.nbImpayés} impayé${stats.nbImpayés > 1 ? 's' : ''}`}
+              label="En retard"
+              value={formatCurrency(stats.enRetard)}
+              sub={stats.enRetard > 0 ? `${stats.nbImpayés} impayé${stats.nbImpayés > 1 ? 's' : ''}` : 'Aucun retard'}
             />
             <KPI
               label="Séances"

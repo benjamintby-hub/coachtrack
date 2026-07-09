@@ -6,6 +6,7 @@ export interface DashboardStats {
   caEncaisseSalle: number
   caEncaisseParticulier: number
   enAttente: number
+  enRetard: number
   nbSeances: number
   nbSeancesSalle: number
   nbSeancesParticulier: number
@@ -18,6 +19,7 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0) {
     caEncaisseSalle: 0,
     caEncaisseParticulier: 0,
     enAttente: 0,
+    enRetard: 0,
     nbSeances: 0,
     nbSeancesSalle: 0,
     nbSeancesParticulier: 0,
@@ -45,7 +47,7 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0) {
       if (!seances) { setLoading(false); return }
 
       let caEncaisse = 0, caEncaisseSalle = 0, caEncaisseParticulier = 0
-      let enAttente = 0, nbImpayés = 0
+      let enAttente = 0, enRetard = 0, nbImpayés = 0
       let nbSeances = 0, nbSeancesSalle = 0, nbSeancesParticulier = 0
 
       for (const s of seances) {
@@ -66,13 +68,17 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0) {
           else caEncaisseParticulier += p.montant_paye
           enAttente += (p.montant_du - p.montant_paye)
           nbImpayés++
-        } else if (p.statut === 'pending' || p.statut === 'late') {
+        } else if (p.statut === 'pending') {
           enAttente += p.montant_du
+          nbImpayés++
+        } else if (p.statut === 'late') {
+          enAttente += p.montant_du
+          enRetard += p.montant_du
           nbImpayés++
         }
       }
 
-      setStats({ caEncaisse, caEncaisseSalle, caEncaisseParticulier, enAttente, nbSeances, nbSeancesSalle, nbSeancesParticulier, nbImpayés })
+      setStats({ caEncaisse, caEncaisseSalle, caEncaisseParticulier, enAttente, enRetard, nbSeances, nbSeancesSalle, nbSeancesParticulier, nbImpayés })
       setSeancesRecentes(seances.slice(0, 8))
       setLoading(false)
     }
