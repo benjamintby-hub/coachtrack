@@ -3,7 +3,7 @@ import Layout from '@/components/Layout'
 import ProtectedRoute from '@/components/ProtectedRoute'
 import Dashboard from '@/pages/Dashboard'
 import Clients from '@/pages/Clients'
-import Seances from '@/pages/Seances'
+import ClientDetail from '@/pages/ClientDetail'
 import Compta from '@/pages/Compta'
 import Stats from '@/pages/Stats'
 import Login from '@/pages/Login'
@@ -17,7 +17,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/clients" element={<Clients />} />
-            <Route path="/seances" element={<Seances />} />
+            <Route path="/clients/:id" element={<ClientDetail />} />
             <Route path="/compta" element={<Compta />} />
             <Route path="/stats" element={<Stats />} />
           </Route>

@@ -2,6 +2,16 @@ import { supabase } from '@/lib/supabase'
 import type { Seance } from '@/types'
 
 export const seancesService = {
+  async getByClient(clientId: string) {
+    const { data, error } = await supabase
+      .from('seances')
+      .select('*, paiements(*)')
+      .eq('client_id', clientId)
+      .order('date', { ascending: false })
+    if (error) throw error
+    return data
+  },
+
   async getAll() {
     const { data, error } = await supabase
       .from('seances')

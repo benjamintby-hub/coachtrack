@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
 import ClientBadge from '@/components/ClientBadge'
 import ClientForm from '@/components/ClientForm'
@@ -8,28 +9,16 @@ import type { Client, ClientType } from '@/types'
 type Filter = 'tous' | ClientType
 
 export default function Clients() {
-  const { clients, loading, error, createClient, updateClient, archiveClient } = useClients()
+  const navigate = useNavigate()
+  const { clients, loading, error, createClient } = useClients()
   const [filter, setFilter] = useState<Filter>('tous')
   const [showForm, setShowForm] = useState(false)
-  const [editing, setEditing] = useState<Client | null>(null)
-  const [confirmArchive, setConfirmArchive] = useState<string | null>(null)
 
   const filtered = clients.filter(c => filter === 'tous' || c.type === filter)
 
   const handleCreate = async (data: Omit<Client, 'id' | 'created_at'>) => {
     await createClient(data)
     setShowForm(false)
-  }
-
-  const handleUpdate = async (data: Omit<Client, 'id' | 'created_at'>) => {
-    if (!editing) return
-    await updateClient(editing.id, data)
-    setEditing(null)
-  }
-
-  const handleArchive = async (id: string) => {
-    await archiveClient(id)
-    setConfirmArchive(null)
   }
 
   return (
@@ -79,7 +68,11 @@ export default function Clients() {
 
       <div className="flex flex-col gap-2">
         {filtered.map(client => (
-          <div key={client.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4">
+          <button
+            key={client.id}
+            onClick={() => navigate(`/clients/${client.id}`)}
+            className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4 hover:border-blue-300 hover:shadow-sm transition-all text-left w-full"
+          >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-medium text-gray-900">{client.prenom} {client.nom}</span>
@@ -93,21 +86,8 @@ export default function Clients() {
             {client.tarif_defaut && (
               <span className="text-sm font-medium text-gray-700">{formatCurrency(client.tarif_defaut)}/séance</span>
             )}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setEditing(client)}
-                className="text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors"
-              >
-                Modifier
-              </button>
-              <button
-                onClick={() => setConfirmArchive(client.id)}
-                className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
-              >
-                Archiver
-              </button>
-            </div>
-          </div>
+            <span className="text-gray-300 text-lg">›</span>
+          </button>
         ))}
       </div>
 
@@ -118,27 +98,6 @@ export default function Clients() {
         </Modal>
       )}
 
-      {/* Modal édition */}
-      {editing && (
-        <Modal title="Modifier le client" onClose={() => setEditing(null)}>
-          <ClientForm initial={editing} onSubmit={handleUpdate} onCancel={() => setEditing(null)} />
-        </Modal>
-      )}
-
-      {/* Confirmation archivage */}
-      {confirmArchive && (
-        <Modal title="Archiver ce client ?" onClose={() => setConfirmArchive(null)}>
-          <p className="text-gray-600 text-sm mb-4">Le client sera masqué mais ses données seront conservées.</p>
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setConfirmArchive(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
-              Annuler
-            </button>
-            <button onClick={() => handleArchive(confirmArchive)} className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700">
-              Archiver
-            </button>
-          </div>
-        </Modal>
-      )}
     </div>
   )
 }
