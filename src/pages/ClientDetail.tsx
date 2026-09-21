@@ -24,6 +24,7 @@ export default function ClientDetail() {
   const [showSeanceForm, setShowSeanceForm] = useState(false)
   const [useForfait, setUseForfait] = useState(false)
   const [editingSeance, setEditingSeance] = useState<any | null>(null)
+  const [editUseForfait, setEditUseForfait] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [editingClient, setEditingClient] = useState(false)
   const [confirmArchive, setConfirmArchive] = useState(false)
@@ -58,17 +59,16 @@ export default function ClientDetail() {
 
   const handleCreateSeance = async (data: SeanceFormData) => {
     const { moyen_paiement, ...seanceData } = data
-    const lierForfait = useForfait && !!forfait
     const newSeance = await seancesService.create(seanceData)
     await paiementsService.create({
       seance_id: newSeance.id,
       montant_du: seanceData.tarif,
-      montant_paye: lierForfait ? seanceData.tarif : 0,
-      statut: lierForfait ? 'paid' : (seanceData.statut_seance === 'done' ? 'pending' : 'cancelled'),
+      montant_paye: 0,
+      statut: seanceData.statut_seance === 'done' ? 'pending' : 'cancelled',
       mode: moyen_paiement as any || undefined,
     })
-    if (lierForfait) {
-      await seancesService.update(newSeance.id, { forfait_id: forfait!.id })
+    if (useForfait && forfait) {
+      await forfaitsService.lierSeance(newSeance.id, forfait.id)
     }
     setShowSeanceForm(false)
     setUseForfait(false)
@@ -82,6 +82,12 @@ export default function ClientDetail() {
     if (moyen_paiement !== undefined) {
       const paiement = editingSeance.paiements?.[0]
       if (paiement) await paiementsService.updateMode(paiement.id, moyen_paiement)
+    }
+    const etaitLiee = !!editingSeance.forfait_id
+    if (editUseForfait && !etaitLiee && forfait) {
+      await forfaitsService.lierSeance(editingSeance.id, forfait.id)
+    } else if (!editUseForfait && etaitLiee) {
+      await forfaitsService.delierSeance(editingSeance.id, seanceData.tarif, seanceData.statut_seance)
     }
     setEditingSeance(null)
     await load()
@@ -148,7 +154,7 @@ export default function ClientDetail() {
   if (!client) return <div className="p-6"><p className="text-red-500 text-sm">Client introuvable.</p></div>
 
   const seancesDone = seances.filter(s => s.statut_seance === 'done')
-  const caTotal = seancesDone.reduce((acc, s) => acc + (s.paiements?.[0]?.montant_paye ?? 0), 0)
+  const caTotal = seancesDone.reduce((acc, s) => acc + (s.paiements?.[0]?.montant_paye ?? 0), 0) + (forfait?.prix_total ?? 0)
   const enAttente = seances.reduce((acc, s) => {
     const p = s.paiements?.[0]
     if (!p || p.statut === 'paid' || p.statut === 'cancelled' || p.statut === 'offered') return acc
@@ -286,10 +292,12 @@ export default function ClientDetail() {
                       {lieeAuForfait && <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-medium">Forfait</span>}
                       {seance.notes && <p className="text-xs text-gray-400 truncate mt-0.5">{seance.notes}</p>}
                     </div>
-                    <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>
+                    {lieeAuForfait
+                      ? <span className="text-sm text-purple-600 shrink-0">Payée par forfait</span>
+                      : <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>}
                   </div>
                   <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
-                    {paiement && (
+                    {paiement && !lieeAuForfait && (
                       <select
                         value={paiement.mode ?? ''}
                         onChange={e => paiementsService.updateMode(paiement.id, e.target.value).then(load)}
@@ -300,7 +308,7 @@ export default function ClientDetail() {
                         <option value="transfer">Virement</option>
                       </select>
                     )}
-                    {paiement && (
+                    {paiement && !lieeAuForfait && (
                       <select
                         value={paiement.statut}
                         onChange={e => handleUpdateStatut(paiement.id, e.target.value as PaymentStatus)}
@@ -314,8 +322,8 @@ export default function ClientDetail() {
                         <option value="cancelled">Annulé</option>
                       </select>
                     )}
-                    {paiement && <PaymentBadge statut={paiement.statut} />}
-                    <button onClick={() => setEditingSeance(seance)} className="text-xs text-gray-400 hover:text-blue-600 shrink-0">Modifier</button>
+                    {paiement && !lieeAuForfait && <PaymentBadge statut={paiement.statut} />}
+                    <button onClick={() => { setEditingSeance(seance); setEditUseForfait(!!seance.forfait_id) }} className="text-xs text-gray-400 hover:text-blue-600 shrink-0">Modifier</button>
                     <button onClick={() => setConfirmDelete(seance.id)} className="text-xs text-gray-400 hover:text-red-600 shrink-0">Supprimer</button>
                   </div>
                 </div>
@@ -353,6 +361,19 @@ export default function ClientDetail() {
       {/* Modal édition séance */}
       {editingSeance && (
         <Modal title="Modifier la séance" onClose={() => setEditingSeance(null)}>
+          {forfait && (editingSeance.forfait_id || nbRestantes > 0) && (
+            <label className="flex items-center gap-3 mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg cursor-pointer">
+              <input
+                type="checkbox"
+                checked={editUseForfait}
+                onChange={e => setEditUseForfait(e.target.checked)}
+                className="w-4 h-4 accent-purple-600"
+              />
+              <span className="text-sm text-purple-700 font-medium">
+                Payée avec le forfait — <span className={restantesCouleur}>{nbRestantes} séance{nbRestantes > 1 ? 's' : ''} restante{nbRestantes > 1 ? 's' : ''}</span>
+              </span>
+            </label>
+          )}
           <SeanceForm
             clients={[client]}
             initial={editingSeance}

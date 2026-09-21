@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useCompta } from '@/hooks/useCompta'
+import { useCompta, type LigneCompta } from '@/hooks/useCompta'
 import { exportPDF } from '@/utils/pdfExport'
 import ClientBadge from '@/components/ClientBadge'
 import PaymentBadge from '@/components/PaymentBadge'
+import ForfaitBadge from '@/components/ForfaitBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import type { ClientType } from '@/types'
 
@@ -117,7 +118,10 @@ export default function Compta() {
                     {/* Téléphone : carte */}
                     <div className="md:hidden px-4 py-3 flex flex-col gap-1">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-medium text-gray-800 truncate">{l.client}</span>
+                        <span className="text-sm font-medium text-gray-800 truncate">
+                          {l.client}
+                          {l.libelle && <span className="text-gray-400 font-normal"> · {l.libelle}</span>}
+                        </span>
                         <span className={`text-sm font-medium shrink-0 ${l.montant_paye > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                           {formatCurrency(l.montant_paye)}
                           <span className="text-gray-400 font-normal"> / {formatCurrency(l.tarif)}</span>
@@ -126,20 +130,23 @@ export default function Compta() {
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-gray-500">{formatDate(l.date)}</span>
                         <ClientBadge type={l.type} />
-                        <span className="ml-auto"><PaymentBadge statut={l.statut as any} /></span>
+                        <span className="ml-auto"><StatutBadge ligne={l} /></span>
                       </div>
                     </div>
                     {/* Ordinateur : ligne de tableau */}
                     <div className="hidden md:grid grid-cols-12 px-4 py-3 items-center hover:bg-gray-50 transition-colors">
                       <span className="col-span-2 text-sm text-gray-500">{formatDate(l.date)}</span>
-                      <span className="col-span-3 text-sm font-medium text-gray-800">{l.client}</span>
+                      <span className="col-span-3 text-sm font-medium text-gray-800">
+                        {l.client}
+                        {l.libelle && <span className="block text-xs text-gray-400 font-normal">{l.libelle}</span>}
+                      </span>
                       <span className="col-span-2"><ClientBadge type={l.type} /></span>
                       <span className="col-span-2 text-sm text-gray-700 text-right">{formatCurrency(l.tarif)}</span>
                       <span className={`col-span-2 text-sm font-medium text-right ${l.montant_paye > 0 ? 'text-green-600' : 'text-gray-400'}`}>
                         {formatCurrency(l.montant_paye)}
                       </span>
                       <span className="col-span-1 flex justify-end">
-                        <PaymentBadge statut={l.statut as any} />
+                        <StatutBadge ligne={l} />
                       </span>
                     </div>
                   </div>
@@ -174,4 +181,10 @@ export default function Compta() {
       )}
     </div>
   )
+}
+
+function StatutBadge({ ligne }: { ligne: LigneCompta }) {
+  if (ligne.forfait === 'achat') return <ForfaitBadge label="Achat forfait" />
+  if (ligne.forfait === 'seance') return <ForfaitBadge />
+  return <PaymentBadge statut={ligne.statut as any} />
 }

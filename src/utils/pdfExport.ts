@@ -112,11 +112,12 @@ export function exportPDF(stats: ComptaStats, mois: number, annee: number) {
     }
     doc.setFontSize(8)
     doc.text(formatDate(l.date), 15, y)
-    doc.text(l.client.substring(0, 28), 35, y)
+    doc.text((l.libelle ? `${l.client} (${l.libelle})` : l.client).substring(0, 34), 35, y)
     doc.text(l.type === 'salle' ? 'Salle' : 'Particulier', 95, y)
     doc.text(formatEur(l.tarif), 120, y)
     doc.text(formatEur(l.montant_paye), 145, y)
-    doc.text(statutLabels[l.statut] ?? l.statut, 170, y)
+    const statut = l.forfait === 'achat' ? 'Achat forfait' : l.forfait === 'seance' ? 'Forfait' : (statutLabels[l.statut] ?? l.statut)
+    doc.text(statut, 170, y)
     y += 6
     doc.setDrawColor(240)
     doc.line(15, y - 1, 195, y - 1)

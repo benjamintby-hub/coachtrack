@@ -1,3 +1,4 @@
+import { forfaitsService } from '@/services/forfaitsService'
 import type { Client } from '@/types'
 
 interface CalendarEvent {
@@ -90,6 +91,7 @@ function matchClient(summary: string, clients: Client[]): Client | undefined {
 
 export interface SyncResult {
   imported: number
+  lieesForfait: number
   skipped: number
   unmatched: string[]
 }
@@ -108,9 +110,12 @@ export async function syncCalendar(
   }
 
   const icsText = await response.text()
-  const events = parseICS(icsText)
+  // Ordre chronologique : le forfait est consommé par les séances les plus anciennes d'abord
+  const events = parseICS(icsText).sort((a, b) =>
+    `${a.date} ${a.heureDebut ?? ''}`.localeCompare(`${b.date} ${b.heureDebut ?? ''}`))
+  const forfaitsRestants = await forfaitsService.getRestantsParClient()
 
-  let imported = 0, skipped = 0
+  let imported = 0, lieesForfait = 0, skipped = 0
   const unmatched: string[] = []
 
   for (const event of events) {
@@ -122,7 +127,7 @@ export async function syncCalendar(
       continue
     }
 
-    await createSeance({
+    const newSeance = await createSeance({
       client_id: client.id,
       date: event.date,
       heure_debut: event.heureDebut,
@@ -133,7 +138,14 @@ export async function syncCalendar(
       uid_calendrier: event.uid,
     })
     imported++
+
+    const restant = forfaitsRestants[client.id]
+    if (restant && restant.restantes > 0) {
+      await forfaitsService.lierSeance(newSeance.id, restant.forfaitId)
+      restant.restantes--
+      lieesForfait++
+    }
   }
 
-  return { imported, skipped, unmatched }
+  return { imported, lieesForfait, skipped, unmatched }
 }

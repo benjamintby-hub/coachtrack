@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { forfaitsService } from '@/services/forfaitsService'
 
 export interface DashboardStats {
   caEncaisse: number
@@ -76,6 +77,15 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0) {
           enRetard += p.montant_du
           nbImpayés++
         }
+      }
+
+      // Forfaits achetés ce mois : encaissés à la date d'achat
+      const achats = await forfaitsService.getAchatsPeriode(debut, fin)
+      for (const f of achats) {
+        const montant = f.prix_total ?? 0
+        caEncaisse += montant
+        if (f.client?.type === 'salle') caEncaisseSalle += montant
+        else caEncaisseParticulier += montant
       }
 
       setStats({ caEncaisse, caEncaisseSalle, caEncaisseParticulier, enAttente, enRetard, nbSeances, nbSeancesSalle, nbSeancesParticulier, nbImpayés })

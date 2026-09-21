@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { forfaitsService } from '@/services/forfaitsService'
 
 const MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc']
 
 export interface StatsData {
-  ca12mois: { mois: string; cash: number; transfer: number; total: number }[]
+  ca12mois: { mois: string; cash: number; transfer: number; forfait: number; total: number }[]
   topClients: { nom: string; ca: number; nbSeances: number }[]
   annulationsParClient: { nom: string; done: number; annulees: number; taux: number }[]
   repartition: { name: string; value: number; color: string }[]
@@ -13,6 +14,7 @@ export interface StatsData {
   totalAnnee: number
   totalCash: number
   totalTransfer: number
+  totalForfaits: number
 }
 
 export function useStats(annee: number) {
@@ -26,6 +28,7 @@ export function useStats(annee: number) {
     totalAnnee: 0,
     totalCash: 0,
     totalTransfer: 0,
+    totalForfaits: 0,
   })
   const [loading, setLoading] = useState(true)
 
@@ -55,14 +58,20 @@ export function useStats(annee: number) {
 
       const seances = seancesRaw.map(s => ({ ...s, paiement: pMap[s.id] ?? null }))
 
+      // Forfaits achetés dans l'année : encaissés à la date d'achat
+      const achats = await forfaitsService.getAchatsPeriode(debut, fin)
+
       // CA par mois
       const ca12mois = MOIS.map((mois, i) => {
         const m = String(i + 1).padStart(2, '0')
         const duMois = seances.filter(s => s.date.startsWith(`${annee}-${m}`) && s.statut_seance === 'done')
         const cash = duMois.filter(s => s.paiement?.mode === 'cash').reduce((acc, s) => acc + (s.paiement?.montant_paye ?? 0), 0)
         const transfer = duMois.filter(s => s.paiement?.mode === 'transfer').reduce((acc, s) => acc + (s.paiement?.montant_paye ?? 0), 0)
-        const total = duMois.reduce((acc, s) => acc + (s.paiement?.montant_paye ?? 0), 0)
-        return { mois, cash, transfer, total }
+        const forfait = achats
+          .filter(f => f.date_achat.startsWith(`${annee}-${m}`))
+          .reduce((acc, f) => acc + (f.prix_total ?? 0), 0)
+        const total = duMois.reduce((acc, s) => acc + (s.paiement?.montant_paye ?? 0), 0) + forfait
+        return { mois, cash, transfer, forfait, total }
       })
 
       // Top clients
@@ -76,6 +85,11 @@ export function useStats(annee: number) {
         clientMap[key].ca += montant
         clientMap[key].nbSeances++
       }
+      for (const f of achats) {
+        const key = f.client_id
+        if (!clientMap[key]) clientMap[key] = { nom: `${f.client?.prenom ?? ''} ${f.client?.nom ?? ''}`.trim(), ca: 0, nbSeances: 0 }
+        clientMap[key].ca += f.prix_total ?? 0
+      }
       const topClients = Object.values(clientMap)
         .sort((a, b) => b.ca - a.ca)
         .slice(0, 5)
@@ -83,9 +97,11 @@ export function useStats(annee: number) {
       // Répartition espèces/virement
       const totalCash = ca12mois.reduce((acc, m) => acc + m.cash, 0)
       const totalTransfer = ca12mois.reduce((acc, m) => acc + m.transfer, 0)
+      const totalForfaits = ca12mois.reduce((acc, m) => acc + m.forfait, 0)
       const repartition = [
         { name: 'Espèces', value: Math.round(totalCash), color: '#10b981' },
         { name: 'Virement', value: Math.round(totalTransfer), color: '#3b82f6' },
+        { name: 'Forfaits', value: Math.round(totalForfaits), color: '#8b5cf6' },
       ]
 
       // Taux annulation global
@@ -124,7 +140,7 @@ export function useStats(annee: number) {
 
       const totalAnnee = ca12mois.reduce((acc, m) => acc + m.total, 0)
 
-      setStats({ ca12mois, topClients, annulationsParClient, repartition, tauxAnnulation, delaiMoyenPaiement, totalAnnee, totalCash, totalTransfer })
+      setStats({ ca12mois, topClients, annulationsParClient, repartition, tauxAnnulation, delaiMoyenPaiement, totalAnnee, totalCash, totalTransfer, totalForfaits })
       setLoading(false)
     }
 

@@ -42,7 +42,7 @@ export default function Stats() {
         <>
           {/* KPIs annuels */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <KPI label="CA annuel" value={formatCurrency(stats.totalAnnee)} sub="Encaissé" />
+            <KPI label="CA annuel" value={formatCurrency(stats.totalAnnee)} sub={stats.totalForfaits > 0 ? `Dont forfaits : ${formatCurrency(stats.totalForfaits)}` : 'Encaissé'} />
             <KPI label="Espèces" value={formatCurrency(stats.totalCash)} />
             <KPI label="Virement" value={formatCurrency(stats.totalTransfer)} />
             <KPI label="Taux annulation" value={`${stats.tauxAnnulation}%`} sub={`Délai paiement : ${stats.delaiMoyenPaiement}j`} />
@@ -60,6 +60,7 @@ export default function Stats() {
                 <Legend />
                 <Bar dataKey="cash" name="Espèces" fill="#10b981" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="transfer" name="Virement" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="forfait" name="Forfaits" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -113,7 +114,7 @@ export default function Stats() {
                       label={({ name, percent }) => `${name} ${Math.round((percent ?? 0) * 100)}%`}
                       labelLine={false}
                     >
-                      {stats.repartition.map((entry, i) => (
+                      {stats.repartition.filter(r => r.value > 0).map((entry, i) => (
                         <Cell key={i} fill={entry.color} />
                       ))}
                     </Pie>

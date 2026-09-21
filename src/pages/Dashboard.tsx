@@ -4,6 +4,7 @@ import { usePaiements } from '@/hooks/usePaiements'
 import { useCalendarSync } from '@/hooks/useCalendarSync'
 import ClientBadge from '@/components/ClientBadge'
 import PaymentBadge from '@/components/PaymentBadge'
+import ForfaitBadge from '@/components/ForfaitBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import type { PaymentStatus } from '@/types'
 
@@ -109,9 +110,13 @@ export default function Dashboard() {
                           </span>
                           <ClientBadge type={seance.type} />
                         </div>
-                        <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>
+                        {!seance.forfait_id && <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>}
                       </div>
-                      {paiement && (
+                      {seance.forfait_id ? (
+                        <div className="flex items-center gap-2 shrink-0 pl-24 sm:pl-0">
+                          <ForfaitBadge />
+                        </div>
+                      ) : paiement && (
                         <div className="flex items-center gap-2 shrink-0 pl-24 sm:pl-0">
                           <select
                             value={paiement.statut}
@@ -166,6 +171,9 @@ export default function Dashboard() {
                 <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
                   <p className="font-medium text-green-700">Synchronisation terminée</p>
                   <p className="text-green-600">{result.imported} séance{result.imported > 1 ? 's' : ''} importée{result.imported > 1 ? 's' : ''}</p>
+                  {result.lieesForfait > 0 && (
+                    <p className="text-purple-600">dont {result.lieesForfait} rattachée{result.lieesForfait > 1 ? 's' : ''} à un forfait</p>
+                  )}
                   <p className="text-gray-500">{result.skipped} déjà présente{result.skipped > 1 ? 's' : ''}</p>
                   {result.unmatched.length > 0 && (
                     <div className="mt-2">

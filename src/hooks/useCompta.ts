@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { forfaitsService } from '@/services/forfaitsService'
 
 export interface LigneCompta {
   date: string
@@ -11,6 +12,9 @@ export interface LigneCompta {
   statut: string
   mode?: string
   date_paiement?: string
+  // 'seance' : séance réglée par un forfait (0 € ici) · 'achat' : encaissement d'un forfait
+  forfait?: 'seance' | 'achat'
+  libelle?: string
 }
 
 export interface ComptaStats {
@@ -94,8 +98,31 @@ export function useCompta(mois: number, annee: number) {
           statut: p.statut,
           mode: p.mode ? modeLabels[p.mode] : undefined,
           date_paiement: p.date_paiement,
+          forfait: s.forfait_id ? 'seance' : undefined,
         })
       }
+
+      // Forfaits achetés ce mois : encaissés à la date d'achat (BNC)
+      const achats = await forfaitsService.getAchatsPeriode(debut, fin)
+      for (const f of achats) {
+        const montant = f.prix_total ?? 0
+        const type = f.client?.type ?? 'particulier'
+        caDeclarable += montant
+        if (type === 'salle') caDeclarableSalle += montant
+        else caDeclarableParticulier += montant
+        lignes.push({
+          date: f.date_achat,
+          client: `${f.client?.prenom ?? ''} ${f.client?.nom ?? ''}`.trim(),
+          type,
+          tarif: montant,
+          montant_du: montant,
+          montant_paye: montant,
+          statut: 'paid',
+          forfait: 'achat',
+          libelle: `Forfait ${f.nb_seances} séances`,
+        })
+      }
+      lignes.sort((a, b) => a.date.localeCompare(b.date))
 
       setStats({ caDeclarable, caDeclarableSalle, caDeclarableParticulier, enAttente, nbSeancesDone, nbOfferts, nbAnnules, lignes })
       setLoading(false)
