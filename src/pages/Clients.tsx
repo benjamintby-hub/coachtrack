@@ -22,7 +22,7 @@ export default function Clients() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -74,17 +74,17 @@ export default function Clients() {
             className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4 hover:border-blue-300 hover:shadow-sm transition-all text-left w-full"
           >
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-gray-900">{client.prenom} {client.nom}</span>
                 <ClientBadge type={client.type} />
               </div>
-              <div className="flex gap-4 mt-0.5">
+              <div className="flex flex-wrap gap-x-4 mt-0.5">
                 {client.email && <span className="text-xs text-gray-400">{client.email}</span>}
                 {client.telephone && <span className="text-xs text-gray-400">{client.telephone}</span>}
               </div>
             </div>
             {client.tarif_defaut && (
-              <span className="text-sm font-medium text-gray-700">{formatCurrency(client.tarif_defaut)}/séance</span>
+              <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(client.tarif_defaut)}<span className="hidden sm:inline">/séance</span></span>
             )}
             <span className="text-gray-300 text-lg">›</span>
           </button>

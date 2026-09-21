@@ -48,7 +48,7 @@ export default function Seances() {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>

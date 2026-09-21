@@ -13,15 +13,15 @@ export default function Stats() {
   const annees = [now.getFullYear() - 1, now.getFullYear()]
 
   const KPI = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
-    <div className="bg-white border border-gray-200 rounded-xl px-5 py-4">
+    <div className="bg-white border border-gray-200 rounded-xl px-4 md:px-5 py-4">
       <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
-      <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
+      <p className="text-xl md:text-2xl font-bold text-gray-900 mt-1">{value}</p>
       {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
     </div>
   )
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Statistiques</h1>
@@ -49,7 +49,7 @@ export default function Stats() {
           </div>
 
           {/* Graphique CA 12 mois */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-4 md:p-5 mb-4">
             <h2 className="font-semibold text-gray-900 mb-4">CA mensuel {annee}</h2>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={stats.ca12mois} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
@@ -73,7 +73,7 @@ export default function Stats() {
               </div>
               <div className="divide-y divide-gray-50">
                 {stats.annulationsParClient.map((c, i) => (
-                  <div key={i} className="flex items-center gap-4 px-5 py-3">
+                  <div key={i} className="flex items-center flex-wrap gap-x-4 gap-y-1 px-4 md:px-5 py-3">
                     <span className="flex-1 text-sm font-medium text-gray-800">{c.nom}</span>
                     <span className="text-sm text-gray-400">{c.annulees} annulation{c.annulees > 1 ? 's' : ''} / {c.done + c.annulees} séances</span>
                     <div className="w-24 flex items-center gap-2">
@@ -134,7 +134,7 @@ export default function Stats() {
                     const pct = stats.totalAnnee > 0 ? (client.ca / stats.totalAnnee) * 100 : 0
                     return (
                       <div key={i}>
-                        <div className="flex justify-between text-sm mb-1">
+                        <div className="flex justify-between flex-wrap gap-x-3 text-sm mb-1">
                           <span className="font-medium text-gray-800">{client.nom}</span>
                           <span className="text-gray-500">{formatCurrency(client.ca)} · {client.nbSeances} séance{client.nbSeances > 1 ? 's' : ''}</span>
                         </div>

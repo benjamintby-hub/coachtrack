@@ -1,18 +1,19 @@
 import { NavLink, Outlet } from 'react-router-dom'
 
 const navItems = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/clients', label: 'Clients' },
-  { to: '/compta', label: 'Comptabilité' },
-  { to: '/stats', label: 'Statistiques' },
+  { to: '/', label: 'Dashboard', shortLabel: 'Accueil', icon: '🏠' },
+  { to: '/clients', label: 'Clients', shortLabel: 'Clients', icon: '👥' },
+  { to: '/compta', label: 'Comptabilité', shortLabel: 'Compta', icon: '💶' },
+  { to: '/stats', label: 'Statistiques', shortLabel: 'Stats', icon: '📊' },
 ]
 
 export default function Layout() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-6">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-6 sticky top-0 z-40">
         <span className="font-bold text-blue-600 text-lg">CoachTrack</span>
-        <nav className="flex gap-4">
+        {/* Menu du haut : ordinateur / tablette */}
+        <nav className="hidden md:flex gap-4">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
@@ -31,9 +32,27 @@ export default function Layout() {
           ))}
         </nav>
       </header>
-      <main className="flex-1">
+      <main className="flex-1 pb-24 md:pb-0">
         <Outlet />
       </main>
+      {/* Barre d'onglets du bas : téléphone */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 grid grid-cols-4 z-40 pb-[env(safe-area-inset-bottom)]">
+        {navItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            end={item.to === '/'}
+            className={({ isActive }) =>
+              `flex flex-col items-center gap-0.5 py-2 text-xs font-medium ${
+                isActive ? 'text-blue-600' : 'text-gray-500'
+              }`
+            }
+          >
+            <span className="text-xl leading-none">{item.icon}</span>
+            {item.shortLabel}
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

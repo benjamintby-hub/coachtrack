@@ -36,11 +36,11 @@ export default function Dashboard() {
   )
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-4 md:p-6 max-w-5xl mx-auto">
       {/* En-tête */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => { setCalendarInput(calendarUrl); setShowCalendarModal(true) }}
             className="border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:border-gray-300 transition-colors"
@@ -100,17 +100,19 @@ export default function Dashboard() {
                 {seancesRecentes.map(seance => {
                   const paiement = paiements.find(p => p.seance_id === seance.id)
                   return (
-                    <div key={seance.id} className="flex items-center gap-4 px-4 py-3">
-                      <span className="text-sm text-gray-400 w-20 shrink-0">{formatDate(seance.date)}</span>
-                      <div className="flex-1 flex items-center gap-2 min-w-0">
-                        <span className="text-sm font-medium text-gray-800 truncate">
-                          {seance.clients?.prenom} {seance.clients?.nom}
-                        </span>
-                        <ClientBadge type={seance.type} />
+                    <div key={seance.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                        <span className="text-sm text-gray-400 w-20 shrink-0">{formatDate(seance.date)}</span>
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                          <span className="text-sm font-medium text-gray-800 truncate">
+                            {seance.clients?.prenom} {seance.clients?.nom}
+                          </span>
+                          <ClientBadge type={seance.type} />
+                        </div>
+                        <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>
                       </div>
-                      <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>
                       {paiement && (
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 pl-24 sm:pl-0">
                           <select
                             value={paiement.statut}
                             onChange={e => updatePaiementStatut(paiement.id, e.target.value as PaymentStatus)}

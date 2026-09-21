@@ -166,7 +166,7 @@ export default function ClientDetail() {
   const restantesCouleur = nbRestantes <= 1 ? 'text-red-500' : nbRestantes <= 3 ? 'text-orange-500' : 'text-green-600'
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-4 md:p-6 max-w-4xl mx-auto">
       <button
         onClick={() => navigate('/clients')}
         className="text-sm text-gray-500 hover:text-gray-700 mb-4 flex items-center gap-1"
@@ -175,9 +175,9 @@ export default function ClientDetail() {
       </button>
 
       {/* Fiche client */}
-      <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 mb-4 flex items-center gap-4">
+      <div className="bg-white border border-gray-200 rounded-xl px-4 md:px-5 py-4 mb-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h1 className="text-xl font-bold text-gray-900">{client.prenom} {client.nom}</h1>
             <ClientBadge type={client.type} />
           </div>
@@ -195,26 +195,32 @@ export default function ClientDetail() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-4">
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between sm:block">
           <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">CA encaissé</p>
-          <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(caTotal)}</p>
+          <p className="text-xl font-bold text-gray-900 sm:mt-1">{formatCurrency(caTotal)}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">En attente</p>
-          <p className="text-xl font-bold text-gray-900 mt-1">{formatCurrency(enAttente)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{nbImpayés} impayé{nbImpayés > 1 ? 's' : ''}</p>
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between sm:block">
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">En attente</p>
+            <p className="text-xs text-gray-400 mt-0.5 sm:hidden">{nbImpayés} impayé{nbImpayés > 1 ? 's' : ''}</p>
+          </div>
+          <p className="text-xl font-bold text-gray-900 sm:mt-1">{formatCurrency(enAttente)}</p>
+          <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">{nbImpayés} impayé{nbImpayés > 1 ? 's' : ''}</p>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3">
-          <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Séances</p>
-          <p className="text-xl font-bold text-gray-900 mt-1">{seances.length}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{seancesDone.length} réalisées</p>
+        <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center justify-between sm:block">
+          <div>
+            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Séances</p>
+            <p className="text-xs text-gray-400 mt-0.5 sm:hidden">{seancesDone.length} réalisées</p>
+          </div>
+          <p className="text-xl font-bold text-gray-900 sm:mt-1">{seances.length}</p>
+          <p className="text-xs text-gray-400 mt-0.5 hidden sm:block">{seancesDone.length} réalisées</p>
         </div>
       </div>
 
       {/* Forfait */}
-      <div className="bg-white border border-gray-200 rounded-xl px-5 py-4 mb-4">
-        <div className="flex items-center justify-between mb-2">
+      <div className="bg-white border border-gray-200 rounded-xl px-4 md:px-5 py-4 mb-4">
+        <div className="flex items-center justify-between gap-2 mb-2">
           <h2 className="font-semibold text-gray-900">Forfait</h2>
           <div className="flex gap-2">
             {forfait ? (
@@ -235,8 +241,8 @@ export default function ClientDetail() {
               {forfait.prix_total != null && <span className="text-sm text-gray-600">{formatCurrency(forfait.prix_total)}</span>}
               <span className="text-sm text-gray-400">le {formatDate(forfait.date_achat)}</span>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
+              <div className="basis-full sm:basis-auto flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${pctUtilise >= 80 ? 'bg-red-400' : pctUtilise >= 60 ? 'bg-orange-400' : 'bg-green-400'}`}
                   style={{ width: `${pctUtilise}%` }}
@@ -255,7 +261,7 @@ export default function ClientDetail() {
 
       {/* Liste séances */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="px-4 md:px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">Séances</h2>
           <button
             onClick={() => setShowSeanceForm(true)}
@@ -273,41 +279,45 @@ export default function ClientDetail() {
               const paiement = seance.paiements?.[0]
               const lieeAuForfait = forfait && seance.forfait_id === forfait.id
               return (
-                <div key={seance.id} className="flex items-center gap-3 px-5 py-3 flex-wrap">
-                  <span className="text-sm text-gray-400 w-20 shrink-0">{formatDate(seance.date)}</span>
-                  <div className="flex-1 min-w-0">
-                    {lieeAuForfait && <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-medium">Forfait</span>}
-                    {seance.notes && <p className="text-xs text-gray-400 truncate mt-0.5">{seance.notes}</p>}
+                <div key={seance.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 px-4 md:px-5 py-3">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className="text-sm text-gray-400 w-20 shrink-0">{formatDate(seance.date)}</span>
+                    <div className="flex-1 min-w-0">
+                      {lieeAuForfait && <span className="text-xs text-purple-600 bg-purple-50 px-1.5 py-0.5 rounded font-medium">Forfait</span>}
+                      {seance.notes && <p className="text-xs text-gray-400 truncate mt-0.5">{seance.notes}</p>}
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>
                   </div>
-                  <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(seance.tarif)}</span>
-                  {paiement && (
-                    <select
-                      value={paiement.mode ?? ''}
-                      onChange={e => paiementsService.updateMode(paiement.id, e.target.value).then(load)}
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shrink-0"
-                    >
-                      <option value="">— Mode —</option>
-                      <option value="cash">Espèces</option>
-                      <option value="transfer">Virement</option>
-                    </select>
-                  )}
-                  {paiement && (
-                    <select
-                      value={paiement.statut}
-                      onChange={e => handleUpdateStatut(paiement.id, e.target.value as PaymentStatus)}
-                      className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shrink-0"
-                    >
-                      <option value="pending">En attente</option>
-                      <option value="paid">Payé</option>
-                      <option value="partial">Partiel</option>
-                      <option value="late">En retard</option>
-                      <option value="offered">Offert</option>
-                      <option value="cancelled">Annulé</option>
-                    </select>
-                  )}
-                  {paiement && <PaymentBadge statut={paiement.statut} />}
-                  <button onClick={() => setEditingSeance(seance)} className="text-xs text-gray-400 hover:text-blue-600 shrink-0">Modifier</button>
-                  <button onClick={() => setConfirmDelete(seance.id)} className="text-xs text-gray-400 hover:text-red-600 shrink-0">Supprimer</button>
+                  <div className="flex items-center gap-x-3 gap-y-2 flex-wrap">
+                    {paiement && (
+                      <select
+                        value={paiement.mode ?? ''}
+                        onChange={e => paiementsService.updateMode(paiement.id, e.target.value).then(load)}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shrink-0"
+                      >
+                        <option value="">— Mode —</option>
+                        <option value="cash">Espèces</option>
+                        <option value="transfer">Virement</option>
+                      </select>
+                    )}
+                    {paiement && (
+                      <select
+                        value={paiement.statut}
+                        onChange={e => handleUpdateStatut(paiement.id, e.target.value as PaymentStatus)}
+                        className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shrink-0"
+                      >
+                        <option value="pending">En attente</option>
+                        <option value="paid">Payé</option>
+                        <option value="partial">Partiel</option>
+                        <option value="late">En retard</option>
+                        <option value="offered">Offert</option>
+                        <option value="cancelled">Annulé</option>
+                      </select>
+                    )}
+                    {paiement && <PaymentBadge statut={paiement.statut} />}
+                    <button onClick={() => setEditingSeance(seance)} className="text-xs text-gray-400 hover:text-blue-600 shrink-0">Modifier</button>
+                    <button onClick={() => setConfirmDelete(seance.id)} className="text-xs text-gray-400 hover:text-red-600 shrink-0">Supprimer</button>
+                  </div>
                 </div>
               )
             })}
