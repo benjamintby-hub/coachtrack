@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Client, ClientType } from '@/types'
+import type { Client } from '@/types'
 
 export const clientsService = {
   async getById(id: string) {

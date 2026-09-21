@@ -12,8 +12,6 @@ import { formatCurrency, formatDate } from '@/utils/formatters'
 import { supabase } from '@/lib/supabase'
 import type { Client, Forfait, PaymentStatus } from '@/types'
 
-const modeLabels: Record<string, string> = { cash: 'Espèces', transfer: 'Virement' }
-
 const defaultForfaitForm = { nb_seances: '', prix_total: '', date_achat: new Date().toISOString().split('T')[0] }
 
 export default function ClientDetail() {
@@ -55,19 +53,23 @@ export default function ClientDetail() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])
 
   const handleCreateSeance = async (data: SeanceFormData) => {
     const { moyen_paiement, ...seanceData } = data
-    if (useForfait && forfait) seanceData.forfait_id = forfait.id
+    const lierForfait = useForfait && !!forfait
     const newSeance = await seancesService.create(seanceData)
     await paiementsService.create({
       seance_id: newSeance.id,
       montant_du: seanceData.tarif,
-      montant_paye: useForfait && forfait ? seanceData.tarif : 0,
-      statut: useForfait && forfait ? 'paid' : (seanceData.statut_seance === 'done' ? 'pending' : 'cancelled'),
+      montant_paye: lierForfait ? seanceData.tarif : 0,
+      statut: lierForfait ? 'paid' : (seanceData.statut_seance === 'done' ? 'pending' : 'cancelled'),
       mode: moyen_paiement as any || undefined,
     })
+    if (lierForfait) {
+      await seancesService.update(newSeance.id, { forfait_id: forfait!.id })
+    }
     setShowSeanceForm(false)
     setUseForfait(false)
     await load()
@@ -444,12 +446,12 @@ export default function ClientDetail() {
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="font-semibold text-gray-900">{title}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
-        <div className="px-6 py-4">{children}</div>
+        <div className="px-6 py-4 overflow-y-auto">{children}</div>
       </div>
     </div>
   )

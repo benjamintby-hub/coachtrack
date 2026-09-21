@@ -6,7 +6,7 @@ import SeanceForm, { type SeanceFormData } from '@/components/SeanceForm'
 import ClientBadge from '@/components/ClientBadge'
 import PaymentBadge from '@/components/PaymentBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
-import type { Seance, ClientType } from '@/types'
+import type { ClientType } from '@/types'
 
 const modeLabels: Record<string, string> = { cash: 'Espèces', transfer: 'Virement' }
 
