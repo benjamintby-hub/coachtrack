@@ -73,7 +73,7 @@ function parseICS(icsText: string): CalendarEvent[] {
 }
 
 function normalize(s: string): string {
-  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
 }
 
 function matchClient(summary: string, clients: Client[]): Client | undefined {
@@ -110,6 +110,9 @@ export async function syncCalendar(
   }
 
   const icsText = await response.text()
+  if (!icsText.includes('BEGIN:VCALENDAR')) {
+    throw new Error("La réponse reçue n'est pas un calendrier : vérifie l'URL et que le proxy /api/calendar-proxy est bien servi")
+  }
   // Ordre chronologique : le forfait est consommé par les séances les plus anciennes d'abord
   const events = parseICS(icsText).sort((a, b) =>
     `${a.date} ${a.heureDebut ?? ''}`.localeCompare(`${b.date} ${b.heureDebut ?? ''}`))
@@ -123,7 +126,9 @@ export async function syncCalendar(
 
     const client = matchClient(event.summary, clients)
     if (!client) {
-      if (!existingUids.includes(event.uid)) unmatched.push(event.summary)
+      unmatched.push(/^\[[^\]]+\]/.test(event.summary)
+        ? `${event.summary} (aucun client actif avec ce nom)`
+        : `${event.summary} (pas de [NOM Prénom] en début de titre)`)
       continue
     }
 
