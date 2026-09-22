@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { CalendarSync, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useDashboard, type VueSeances } from '@/hooks/useDashboard'
 import { usePaiements } from '@/hooks/usePaiements'
@@ -61,9 +62,10 @@ export default function Dashboard() {
         <div className="flex flex-wrap gap-2">
           <button
             onClick={() => { setCalendarInput(calendarUrl); setShowCalendarModal(true) }}
-            className="border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:border-gray-300 transition-colors"
+            className="border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-sm hover:border-gray-300 transition-colors flex items-center gap-1.5"
           >
-            📅 Calendrier
+            <CalendarSync size={16} aria-hidden="true" />
+            Calendrier
           </button>
           <select
             value={mois}
@@ -182,7 +184,7 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <h2 className="font-semibold text-gray-900">Synchronisation Apple Calendar</h2>
-              <button onClick={() => setShowCalendarModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+              <button onClick={() => setShowCalendarModal(false)} aria-label="Fermer" className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="px-6 py-4 flex flex-col gap-4">
               <p className="text-sm text-gray-600">

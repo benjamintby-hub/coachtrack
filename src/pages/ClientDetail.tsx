@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { ArrowLeft, X } from 'lucide-react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { clientsService } from '@/services/clientsService'
 import { seancesService } from '@/services/seancesService'
@@ -227,7 +228,8 @@ export default function ClientDetail() {
         onClick={() => navigate('/clients')}
         className="text-sm text-gray-500 hover:text-gray-700 mb-4 flex items-center gap-1"
       >
-        ← Clients
+        <ArrowLeft size={16} aria-hidden="true" />
+        Clients
       </button>
 
       {/* Fiche client */}
@@ -575,7 +577,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
         <div className="px-6 py-4 overflow-y-auto">{children}</div>
       </div>

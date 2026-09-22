@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { LayoutDashboard, Users, ReceiptEuro, ChartColumn } from 'lucide-react'
 import { useAutoCalendarSync } from '@/hooks/useCalendarSync'
 
 const navItems = [
-  { to: '/', label: 'Dashboard', shortLabel: 'Accueil', icon: '🏠' },
-  { to: '/clients', label: 'Clients', shortLabel: 'Clients', icon: '👥' },
-  { to: '/compta', label: 'Comptabilité', shortLabel: 'Compta', icon: '💶' },
-  { to: '/stats', label: 'Statistiques', shortLabel: 'Stats', icon: '📊' },
+  { to: '/', label: 'Dashboard', shortLabel: 'Accueil', icon: LayoutDashboard },
+  { to: '/clients', label: 'Clients', shortLabel: 'Clients', icon: Users },
+  { to: '/compta', label: 'Comptabilité', shortLabel: 'Compta', icon: ReceiptEuro },
+  { to: '/stats', label: 'Statistiques', shortLabel: 'Stats', icon: ChartColumn },
 ]
 
 export default function Layout() {
@@ -23,13 +24,14 @@ export default function Layout() {
               to={item.to}
               end={item.to === '/'}
               className={({ isActive }) =>
-                `text-sm font-medium px-3 py-1.5 rounded-md transition-colors ${
+                `text-sm font-medium px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 ${
                   isActive
                     ? 'bg-blue-50 text-blue-600'
                     : 'text-gray-600 hover:text-gray-900'
                 }`
               }
             >
+              <item.icon size={16} strokeWidth={2} aria-hidden="true" />
               {item.label}
             </NavLink>
           ))}
@@ -51,7 +53,7 @@ export default function Layout() {
               }`
             }
           >
-            <span className="text-xl leading-none">{item.icon}</span>
+            <item.icon size={22} strokeWidth={1.75} aria-hidden="true" />
             {item.shortLabel}
           </NavLink>
         ))}

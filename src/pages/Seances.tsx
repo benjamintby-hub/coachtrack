@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import { useSeances } from '@/hooks/useSeances'
 import { useClients } from '@/hooks/useClients'
 import { usePaiements } from '@/hooks/usePaiements'
@@ -194,7 +195,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
         <div className="px-6 py-4">{children}</div>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronRight, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
 import ClientBadge from '@/components/ClientBadge'
@@ -86,7 +87,7 @@ export default function Clients() {
             {client.tarif_defaut && (
               <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(client.tarif_defaut)}<span className="hidden sm:inline">/séance</span></span>
             )}
-            <span className="text-gray-300 text-lg">›</span>
+            <ChevronRight size={18} className="text-gray-300 shrink-0" aria-hidden="true" />
           </button>
         ))}
       </div>
@@ -108,7 +109,7 @@ function Modal({ title, children, onClose }: { title: string; children: React.Re
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h2 className="font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+          <button onClick={onClose} aria-label="Fermer" className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
         </div>
         <div className="px-6 py-4">{children}</div>
       </div>
