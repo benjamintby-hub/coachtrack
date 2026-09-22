@@ -13,6 +13,18 @@ import { supabase } from '@/lib/supabase'
 import { CALENDAR_SYNCED_EVENT } from '@/services/calendarService'
 import type { Client, Forfait, PaymentStatus } from '@/types'
 
+const moisLabels = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
+const STATUTS_A_REGLER: PaymentStatus[] = ['pending', 'late', 'partial']
+
+// Les 12 derniers mois au format YYYY-MM, du plus récent au plus ancien
+function derniersMois(): string[] {
+  const now = new Date()
+  return Array.from({ length: 12 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  })
+}
+
 const defaultForfaitForm = { nb_seances: '', prix_total: '', date_achat: new Date().toISOString().split('T')[0] }
 
 export default function ClientDetail() {
@@ -33,6 +45,9 @@ export default function ClientDetail() {
   const [showForfaitForm, setShowForfaitForm] = useState(false)
   const [forfaitForm, setForfaitForm] = useState(defaultForfaitForm)
   const [confirmDeleteForfait, setConfirmDeleteForfait] = useState(false)
+  // Par défaut le mois précédent (règlement mensuel en début de mois)
+  const [moisReglement, setMoisReglement] = useState<string | null>(null)
+  const [reglementEnCours, setReglementEnCours] = useState(false)
 
   const load = async (silent = false) => {
     if (!id) return
@@ -121,6 +136,22 @@ export default function ClientDetail() {
   const handleUpdateStatut = async (paiementId: string, statut: PaymentStatus) => {
     await paiementsService.updateStatut(paiementId, statut)
     await load()
+  }
+
+  // Séances non forfait du mois choisi qui restent à régler
+  const seancesARegler = (mois: string) => seances.filter(s =>
+    s.date.startsWith(mois) && s.statut_seance === 'done' && !s.forfait_id &&
+    STATUTS_A_REGLER.includes(s.paiements?.[0]?.statut))
+
+  const handleReglerMois = async () => {
+    if (!moisReglement) return
+    setReglementEnCours(true)
+    for (const s of seancesARegler(moisReglement)) {
+      await paiementsService.updateStatut(s.paiements[0].id, 'paid')
+    }
+    setReglementEnCours(false)
+    setMoisReglement(null)
+    await load(true)
   }
 
   const handleUpdateClient = async (data: Omit<Client, 'id' | 'created_at'>) => {
@@ -214,6 +245,7 @@ export default function ClientDetail() {
           {client.notes && <p className="text-xs text-gray-400 mt-1">{client.notes}</p>}
         </div>
         <div className="flex gap-2 shrink-0">
+          <button onClick={() => setMoisReglement(derniersMois()[1])} className="text-xs text-gray-500 hover:text-green-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-green-300 transition-colors">Régler un mois</button>
           <button onClick={() => setEditingClient(true)} className="text-xs text-gray-500 hover:text-blue-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">Modifier</button>
           <button onClick={() => setConfirmArchive(true)} className="text-xs text-gray-500 hover:text-red-600 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-red-300 transition-colors">Archiver</button>
         </div>
@@ -480,6 +512,50 @@ export default function ClientDetail() {
       )}
 
       {/* Confirmation archivage */}
+      {/* Modal règlement d'un mois */}
+      {moisReglement && (() => {
+        const aRegler = seancesARegler(moisReglement)
+        const total = aRegler.reduce((acc, s) => acc + (s.paiements[0].montant_du - s.paiements[0].montant_paye), 0)
+        return (
+          <Modal title="Marquer un mois comme payé" onClose={() => setMoisReglement(null)}>
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mois</label>
+                <select
+                  value={moisReglement}
+                  onChange={e => setMoisReglement(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {derniersMois().map(m => (
+                    <option key={m} value={m}>{moisLabels[Number(m.slice(5)) - 1]} {m.slice(0, 4)}</option>
+                  ))}
+                </select>
+              </div>
+              {aRegler.length === 0 ? (
+                <p className="text-sm text-gray-500">Aucune séance à régler sur ce mois.</p>
+              ) : (
+                <div className="text-sm text-gray-600">
+                  <p>
+                    <span className="font-medium text-gray-900">{aRegler.length} séance{aRegler.length > 1 ? 's' : ''}</span> en attente, en retard ou partielle{aRegler.length > 1 ? 's' : ''} passeront en « Payé », pour un reste à encaisser de <span className="font-medium text-gray-900">{formatCurrency(total)}</span>.
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Les séances payées avec le forfait, offertes ou annulées ne sont pas modifiées.</p>
+                </div>
+              )}
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setMoisReglement(null)} className="px-4 py-2 text-sm text-gray-600">Annuler</button>
+                <button
+                  onClick={handleReglerMois}
+                  disabled={aRegler.length === 0 || reglementEnCours}
+                  className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50"
+                >
+                  {reglementEnCours ? 'En cours...' : 'Marquer payé'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )
+      })()}
+
       {confirmArchive && (
         <Modal title="Archiver ce client ?" onClose={() => setConfirmArchive(false)}>
           <p className="text-gray-600 text-sm mb-4">Le client sera masqué mais ses données seront conservées.</p>
