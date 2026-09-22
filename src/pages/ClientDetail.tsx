@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { clientsService } from '@/services/clientsService'
 import { seancesService } from '@/services/seancesService'
 import { paiementsService } from '@/services/paiementsService'
@@ -17,6 +17,7 @@ const defaultForfaitForm = { nb_seances: '', prix_total: '', date_achat: new Dat
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [client, setClient] = useState<Client | null>(null)
   const [seances, setSeances] = useState<any[]>([])
   const [forfait, setForfait] = useState<Forfait | null>(null)
@@ -50,8 +51,17 @@ export default function ClientDetail() {
         .from('paiements').select('*').in('seance_id', ids)
       for (const p of paiementsRaw ?? []) pMap[p.seance_id] = p
     }
-    setSeances((seancesRaw ?? []).map((s: any) => ({ ...s, paiements: pMap[s.id] ? [pMap[s.id]] : [] })))
+    const seancesWithPaiements = (seancesRaw ?? []).map((s: any) => ({ ...s, paiements: pMap[s.id] ? [pMap[s.id]] : [] }))
+    setSeances(seancesWithPaiements)
     setLoading(false)
+
+    // Ouverture directe d'une séance depuis le tableau de bord (?seance=<id>)
+    const seanceId = searchParams.get('seance')
+    if (seanceId) {
+      const cible = seancesWithPaiements.find((s: any) => s.id === seanceId)
+      if (cible) { setEditingSeance(cible); setEditUseForfait(!!cible.forfait_id) }
+      setSearchParams({}, { replace: true })
+    }
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps

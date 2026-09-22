@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { forfaitsService } from '@/services/forfaitsService'
+import { toISODate } from '@/utils/formatters'
 
 export interface DashboardStats {
   caEncaisse: number
@@ -14,7 +15,20 @@ export interface DashboardStats {
   nbImpayés: number
 }
 
-export function useDashboard(mois: number, annee: number, refreshKey = 0) {
+export type VueSeances = 'mois' | 'semaine' | 'jour'
+
+// Bornes de la semaine en cours (lundi → dimanche) ou du jour
+function bornesVue(vue: Exclude<VueSeances, 'mois'>): [string, string] {
+  const today = new Date()
+  if (vue === 'jour') return [toISODate(today), toISODate(today)]
+  const lundi = new Date(today)
+  lundi.setDate(today.getDate() - ((today.getDay() + 6) % 7))
+  const dimanche = new Date(lundi)
+  dimanche.setDate(lundi.getDate() + 6)
+  return [toISODate(lundi), toISODate(dimanche)]
+}
+
+export function useDashboard(mois: number, annee: number, refreshKey = 0, vue: VueSeances = 'mois') {
   const [stats, setStats] = useState<DashboardStats>({
     caEncaisse: 0,
     caEncaisseSalle: 0,
@@ -26,7 +40,8 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0) {
     nbSeancesParticulier: 0,
     nbImpayés: 0,
   })
-  const [seancesRecentes, setSeancesRecentes] = useState<any[]>([])
+  const [seancesMois, setSeancesMois] = useState<any[]>([])
+  const [seancesPeriode, setSeancesPeriode] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -34,7 +49,7 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0) {
       setLoading(true)
 
       const debut = `${annee}-${String(mois).padStart(2, '0')}-01`
-      const fin = new Date(annee, mois, 0).toISOString().split('T')[0]
+      const fin = toISODate(new Date(annee, mois, 0))
 
       // Séances du mois
       const { data: seances } = await supabase
@@ -89,12 +104,29 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0) {
       }
 
       setStats({ caEncaisse, caEncaisseSalle, caEncaisseParticulier, enAttente, enRetard, nbSeances, nbSeancesSalle, nbSeancesParticulier, nbImpayés })
-      setSeancesRecentes(seances.slice(0, 8))
+      setSeancesMois(seances.slice(0, 8))
       setLoading(false)
     }
 
     load()
   }, [mois, annee, refreshKey])
+
+  // Séances de la semaine ou du jour, indépendamment du mois sélectionné
+  useEffect(() => {
+    if (vue === 'mois') return
+    const [debut, fin] = bornesVue(vue)
+    supabase
+      .from('seances')
+      .select('*, paiements(*), clients(nom, prenom, type)')
+      .gte('date', debut)
+      .lte('date', fin)
+      .eq('statut_seance', 'done')
+      .order('date', { ascending: true })
+      .order('heure_debut', { ascending: true })
+      .then(({ data }) => setSeancesPeriode(data ?? []))
+  }, [vue, refreshKey])
+
+  const seancesRecentes = vue === 'mois' ? seancesMois : seancesPeriode
 
   return { stats, seancesRecentes, loading }
 }

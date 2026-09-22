@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useDashboard } from '@/hooks/useDashboard'
+import { useNavigate } from 'react-router-dom'
+import { useDashboard, type VueSeances } from '@/hooks/useDashboard'
 import { usePaiements } from '@/hooks/usePaiements'
 import { useCalendarSync } from '@/hooks/useCalendarSync'
 import ClientBadge from '@/components/ClientBadge'
@@ -8,16 +9,24 @@ import ForfaitBadge from '@/components/ForfaitBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import type { PaymentStatus } from '@/types'
 
+const vues: { value: VueSeances; label: string; titre: string; vide: string }[] = [
+  { value: 'mois', label: 'Mois', titre: 'Séances du mois', vide: 'Aucune séance ce mois-ci' },
+  { value: 'semaine', label: 'Semaine', titre: 'Séances de la semaine', vide: 'Aucune séance cette semaine' },
+  { value: 'jour', label: 'Jour', titre: "Séances du jour", vide: "Aucune séance aujourd'hui" },
+]
+
 const moisLabels = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 
 export default function Dashboard() {
+  const navigate = useNavigate()
   const now = new Date()
   const [mois, setMois] = useState(now.getMonth() + 1)
   const [annee, setAnnee] = useState(now.getFullYear())
   const [refreshKey, setRefreshKey] = useState(0)
   const [showCalendarModal, setShowCalendarModal] = useState(false)
   const [calendarInput, setCalendarInput] = useState('')
-  const { stats, seancesRecentes, loading } = useDashboard(mois, annee, refreshKey)
+  const [vue, setVue] = useState<VueSeances>('mois')
+  const { stats, seancesRecentes, loading } = useDashboard(mois, annee, refreshKey, vue)
   const { paiements, updatePaiementStatut: _updatePaiementStatut } = usePaiements()
   const { calendarUrl, saveUrl, sync, syncing, result, error: syncError } = useCalendarSync()
 
@@ -91,19 +100,36 @@ export default function Dashboard() {
 
           {/* Séances récentes */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900 text-sm">Séances du mois</h2>
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
+              <h2 className="font-semibold text-gray-900 text-sm">{vues.find(v => v.value === vue)!.titre}</h2>
+              <div className="flex bg-gray-100 rounded-lg p-0.5">
+                {vues.map(v => (
+                  <button
+                    key={v.value}
+                    onClick={() => setVue(v.value)}
+                    className={`px-2.5 py-1 text-xs rounded-md transition-colors ${vue === v.value ? 'bg-white text-gray-900 shadow-sm font-medium' : 'text-gray-500 hover:text-gray-700'}`}
+                  >
+                    {v.label}
+                  </button>
+                ))}
+              </div>
             </div>
             {seancesRecentes.length === 0 ? (
-              <p className="text-center text-gray-400 text-sm py-8">Aucune séance ce mois-ci</p>
+              <p className="text-center text-gray-400 text-sm py-8">{vues.find(v => v.value === vue)!.vide}</p>
             ) : (
               <div className="divide-y divide-gray-50">
                 {seancesRecentes.map(seance => {
                   const paiement = paiements.find(p => p.seance_id === seance.id)
                   return (
-                    <div key={seance.id} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
+                    <div
+                      key={seance.id}
+                      onClick={() => navigate(`/clients/${seance.client_id}?seance=${seance.id}`)}
+                      className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                    >
                       <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <span className="text-sm text-gray-400 w-20 shrink-0">{formatDate(seance.date)}</span>
+                        <span className="text-sm text-gray-400 w-20 shrink-0">
+                          {vue === 'jour' ? (seance.heure_debut?.slice(0, 5) ?? '—') : formatDate(seance.date)}
+                        </span>
                         <div className="flex-1 flex items-center gap-2 min-w-0">
                           <span className="text-sm font-medium text-gray-800 truncate">
                             {seance.clients?.prenom} {seance.clients?.nom}
@@ -117,7 +143,7 @@ export default function Dashboard() {
                           <ForfaitBadge />
                         </div>
                       ) : paiement && (
-                        <div className="flex items-center gap-2 shrink-0 pl-24 sm:pl-0">
+                        <div className="flex items-center gap-2 shrink-0 pl-24 sm:pl-0" onClick={e => e.stopPropagation()}>
                           <select
                             value={paiement.statut}
                             onChange={e => updatePaiementStatut(paiement.id, e.target.value as PaymentStatus)}
