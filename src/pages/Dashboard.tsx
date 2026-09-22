@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useDashboard, type VueSeances } from '@/hooks/useDashboard'
 import { usePaiements } from '@/hooks/usePaiements'
 import { useCalendarSync } from '@/hooks/useCalendarSync'
+import { CALENDAR_SYNCED_EVENT } from '@/services/calendarService'
 import ClientBadge from '@/components/ClientBadge'
 import PaymentBadge from '@/components/PaymentBadge'
 import ForfaitBadge from '@/components/ForfaitBadge'
@@ -29,6 +30,13 @@ export default function Dashboard() {
   const { stats, seancesRecentes, loading } = useDashboard(mois, annee, refreshKey, vue)
   const { paiements, updatePaiementStatut: _updatePaiementStatut } = usePaiements()
   const { calendarUrl, saveUrl, sync, syncing, result, error: syncError } = useCalendarSync()
+
+  // Recharge après chaque synchro calendrier (manuelle ou automatique)
+  useEffect(() => {
+    const refresh = () => setRefreshKey(k => k + 1)
+    window.addEventListener(CALENDAR_SYNCED_EVENT, refresh)
+    return () => window.removeEventListener(CALENDAR_SYNCED_EVENT, refresh)
+  }, [])
 
   const updatePaiementStatut = async (id: string, statut: PaymentStatus) => {
     await _updatePaiementStatut(id, statut)
@@ -178,7 +186,7 @@ export default function Dashboard() {
             </div>
             <div className="px-6 py-4 flex flex-col gap-4">
               <p className="text-sm text-gray-600">
-                Colle ici l'URL de ton calendrier iCloud public. Les événements nommés <code className="bg-gray-100 px-1 rounded text-xs">[NOM Prénom]</code> seront automatiquement importés.
+                Colle ici l'URL de ton calendrier iCloud public. Les événements nommés <code className="bg-gray-100 px-1 rounded text-xs">[NOM Prénom]</code> seront automatiquement importés, puis resynchronisés à chaque ouverture de l'appli et toutes les 15 minutes.
               </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">URL du calendrier (webcal://...)</label>
@@ -200,6 +208,12 @@ export default function Dashboard() {
                   {result.lieesForfait > 0 && (
                     <p className="text-purple-600">dont {result.lieesForfait} rattachée{result.lieesForfait > 1 ? 's' : ''} à un forfait</p>
                   )}
+                  {result.updated > 0 && (
+                    <p className="text-blue-600">{result.updated} séance{result.updated > 1 ? 's' : ''} déplacée{result.updated > 1 ? 's' : ''} mise{result.updated > 1 ? 's' : ''} à jour</p>
+                  )}
+                  {result.deleted > 0 && (
+                    <p className="text-red-600">{result.deleted} séance{result.deleted > 1 ? 's' : ''} supprimée{result.deleted > 1 ? 's' : ''} (retirée{result.deleted > 1 ? 's' : ''} du calendrier)</p>
+                  )}
                   <p className="text-gray-500">{result.skipped} déjà présente{result.skipped > 1 ? 's' : ''}</p>
                   {result.unmatched.length > 0 && (
                     <div className="mt-2">
@@ -218,7 +232,6 @@ export default function Dashboard() {
                   onClick={async () => {
                     saveUrl(calendarInput)
                     await sync(calendarInput)
-                    setRefreshKey(k => k + 1)
                   }}
                   disabled={syncing || !calendarInput}
                   className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50"

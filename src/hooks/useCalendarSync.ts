@@ -1,22 +1,12 @@
-import { useState } from 'react'
-import { syncCalendar, type SyncResult } from '@/services/calendarService'
-import { useClients } from '@/hooks/useClients'
-import { useSeances } from '@/hooks/useSeances'
-
-const STORAGE_KEY = 'coachtrack_calendar_url'
+import { useEffect, useRef, useState } from 'react'
+import { syncCalendar, getCalendarUrl, saveCalendarUrl, type SyncResult } from '@/services/calendarService'
 
 export function useCalendarSync() {
-  const { clients } = useClients()
-  const { seances, createSeance } = useSeances()
   const [syncing, setSyncing] = useState(false)
   const [result, setResult] = useState<SyncResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const calendarUrl = localStorage.getItem(STORAGE_KEY) ?? ''
-
-  const saveUrl = (url: string) => {
-    localStorage.setItem(STORAGE_KEY, url)
-  }
+  const calendarUrl = getCalendarUrl()
 
   const sync = async (url?: string) => {
     const targetUrl = url ?? calendarUrl
@@ -27,12 +17,7 @@ export function useCalendarSync() {
     setResult(null)
 
     try {
-      const existingUids = seances
-        .map((s: any) => s.uid_calendrier)
-        .filter(Boolean)
-
-      const res = await syncCalendar(targetUrl, clients, existingUids, createSeance)
-      setResult(res)
+      setResult(await syncCalendar(targetUrl))
     } catch (e: any) {
       setError(e.message ?? 'Erreur de synchronisation')
     } finally {
@@ -40,5 +25,32 @@ export function useCalendarSync() {
     }
   }
 
-  return { calendarUrl, saveUrl, sync, syncing, result, error }
+  return { calendarUrl, saveUrl: saveCalendarUrl, sync, syncing, result, error }
+}
+
+const INTERVALLE_MS = 15 * 60 * 1000
+const DELAI_MIN_MS = 60 * 1000
+
+// Synchro en arrière-plan : à l'ouverture, au retour sur l'appli et toutes les 15 min
+export function useAutoCalendarSync() {
+  const derniere = useRef(0)
+
+  useEffect(() => {
+    const lancer = () => {
+      const url = getCalendarUrl()
+      if (!url || document.visibilityState !== 'visible') return
+      // Évite de relancer à chaque changement d'onglet rapproché
+      if (Date.now() - derniere.current < DELAI_MIN_MS) return
+      derniere.current = Date.now()
+      syncCalendar(url).catch(e => console.warn('Synchro calendrier automatique échouée :', e))
+    }
+
+    lancer()
+    const timer = setInterval(lancer, INTERVALLE_MS)
+    document.addEventListener('visibilitychange', lancer)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', lancer)
+    }
+  }, [])
 }

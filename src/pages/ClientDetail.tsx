@@ -10,6 +10,7 @@ import SeanceForm, { type SeanceFormData } from '@/components/SeanceForm'
 import PaymentBadge from '@/components/PaymentBadge'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import { supabase } from '@/lib/supabase'
+import { CALENDAR_SYNCED_EVENT } from '@/services/calendarService'
 import type { Client, Forfait, PaymentStatus } from '@/types'
 
 const defaultForfaitForm = { nb_seances: '', prix_total: '', date_achat: new Date().toISOString().split('T')[0] }
@@ -33,9 +34,9 @@ export default function ClientDetail() {
   const [forfaitForm, setForfaitForm] = useState(defaultForfaitForm)
   const [confirmDeleteForfait, setConfirmDeleteForfait] = useState(false)
 
-  const load = async () => {
+  const load = async (silent = false) => {
     if (!id) return
-    setLoading(true)
+    if (!silent) setLoading(true)
     const [clientData, seancesRaw, forfaitData] = await Promise.all([
       clientsService.getById(id),
       seancesService.getByClient(id),
@@ -66,6 +67,14 @@ export default function ClientDetail() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { load() }, [id])
+
+  // Recharge après une synchro calendrier (sans l'écran de chargement)
+  useEffect(() => {
+    const refresh = () => { load(true) }
+    window.addEventListener(CALENDAR_SYNCED_EVENT, refresh)
+    return () => window.removeEventListener(CALENDAR_SYNCED_EVENT, refresh)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   const handleCreateSeance = async (data: SeanceFormData) => {
     const { moyen_paiement, ...seanceData } = data
@@ -310,7 +319,7 @@ export default function ClientDetail() {
                     {paiement && !lieeAuForfait && (
                       <select
                         value={paiement.mode ?? ''}
-                        onChange={e => paiementsService.updateMode(paiement.id, e.target.value).then(load)}
+                        onChange={e => paiementsService.updateMode(paiement.id, e.target.value).then(() => load())}
                         className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500 shrink-0"
                       >
                         <option value="">— Mode —</option>

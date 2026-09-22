@@ -1,3 +1,7 @@
+import { supabase } from '@/lib/supabase'
+import { clientsService } from '@/services/clientsService'
+import { seancesService } from '@/services/seancesService'
+import { paiementsService } from '@/services/paiementsService'
 import { forfaitsService } from '@/services/forfaitsService'
 import type { Client } from '@/types'
 
@@ -92,16 +96,35 @@ function matchClient(summary: string, clients: Client[]): Client | undefined {
 export interface SyncResult {
   imported: number
   lieesForfait: number
+  updated: number
+  deleted: number
   skipped: number
   unmatched: string[]
 }
 
-export async function syncCalendar(
-  calendarUrl: string,
-  clients: Client[],
-  existingUids: string[],
-  createSeance: (data: any) => Promise<any>,
-): Promise<SyncResult> {
+export const CALENDAR_URL_KEY = 'coachtrack_calendar_url'
+// Événement émis quand une synchro a modifié des séances, pour que les pages rechargent leurs données
+export const CALENDAR_SYNCED_EVENT = 'coachtrack:calendar-synced'
+
+export function getCalendarUrl(): string {
+  try { return localStorage.getItem(CALENDAR_URL_KEY) ?? '' } catch { return '' }
+}
+
+export function saveCalendarUrl(url: string) {
+  try { localStorage.setItem(CALENDAR_URL_KEY, url) } catch { /* stockage indisponible */ }
+}
+
+// Une seule synchro à la fois : les appels simultanés partagent la synchro en cours
+let enCours: Promise<SyncResult> | null = null
+
+export function syncCalendar(calendarUrl: string): Promise<SyncResult> {
+  if (!enCours) {
+    enCours = runSync(calendarUrl).finally(() => { enCours = null })
+  }
+  return enCours
+}
+
+async function runSync(calendarUrl: string): Promise<SyncResult> {
   const proxyUrl = `/api/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`
   const response = await fetch(proxyUrl)
   if (!response.ok) {
@@ -116,32 +139,53 @@ export async function syncCalendar(
   // Ordre chronologique : le forfait est consommé par les séances les plus anciennes d'abord
   const events = parseICS(icsText).sort((a, b) =>
     `${a.date} ${a.heureDebut ?? ''}`.localeCompare(`${b.date} ${b.heureDebut ?? ''}`))
-  const forfaitsRestants = await forfaitsService.getRestantsParClient()
 
-  let imported = 0, lieesForfait = 0, skipped = 0
+  const [clients, forfaitsRestants, { data: existantes, error }] = await Promise.all([
+    clientsService.getAll(),
+    forfaitsService.getRestantsParClient(),
+    supabase.from('seances').select('id, uid_calendrier, date, heure_debut, duree_minutes, forfait_id').not('uid_calendrier', 'is', null),
+  ])
+  if (error) throw error
+  const parUid = new Map((existantes ?? []).map(s => [s.uid_calendrier as string, s]))
+
+  let imported = 0, lieesForfait = 0, updated = 0, deleted = 0, skipped = 0
   const unmatched: string[] = []
+  const vus = new Set<string>()
 
   for (const event of events) {
-    if (existingUids.includes(event.uid)) { skipped++; continue }
+    // Un même UID peut apparaître plusieurs fois (occurrences modifiées d'un événement récurrent)
+    if (vus.has(event.uid)) continue
+    vus.add(event.uid)
 
-    const client = matchClient(event.summary, clients)
-    if (!client) {
-      unmatched.push(/^\[[^\]]+\]/.test(event.summary)
-        ? `${event.summary} (aucun client actif avec ce nom)`
-        : `${event.summary} (pas de [NOM Prénom] en début de titre)`)
+    const existante = parUid.get(event.uid)
+    if (existante) {
+      // Rendez-vous déplacé dans le calendrier : on reporte date, heure et durée
+      const heure = event.heureDebut ?? null
+      const duree = event.dureeMinutes ?? null
+      if (existante.date !== event.date || existante.heure_debut?.slice(0, 5) !== (heure ?? undefined) || existante.duree_minutes !== duree) {
+        await seancesService.update(existante.id, { date: event.date, heure_debut: heure as any, duree_minutes: duree as any })
+        updated++
+      } else {
+        skipped++
+      }
       continue
     }
 
-    const newSeance = await createSeance({
+    const client = matchClient(event.summary, clients)
+    if (!client) { unmatched.push(event.summary); continue }
+
+    const tarif = client.tarif_defaut ?? 0
+    const newSeance = await seancesService.create({
       client_id: client.id,
       date: event.date,
       heure_debut: event.heureDebut,
       duree_minutes: event.dureeMinutes,
-      tarif: client.tarif_defaut ?? 0,
+      tarif,
       statut_seance: 'done',
       type: client.type,
       uid_calendrier: event.uid,
     })
+    await paiementsService.create({ seance_id: newSeance.id, montant_du: tarif, montant_paye: 0, statut: 'pending' })
     imported++
 
     const restant = forfaitsRestants[client.id]
@@ -152,5 +196,38 @@ export async function syncCalendar(
     }
   }
 
-  return { imported, lieesForfait, skipped, unmatched }
+  deleted = await supprimerDisparues(events, existantes ?? [])
+
+  if (imported > 0 || updated > 0 || deleted > 0) window.dispatchEvent(new Event(CALENDAR_SYNCED_EVENT))
+  return { imported, lieesForfait, updated, deleted, skipped, unmatched }
+}
+
+// Supprime les séances importées dont le rendez-vous a disparu du calendrier.
+// On garde celles qui ont déjà un paiement enregistré (payée, partielle, offerte) pour ne pas fausser le CA.
+async function supprimerDisparues(
+  events: CalendarEvent[],
+  existantes: { id: string; uid_calendrier: string | null; date: string; forfait_id: string | null }[],
+): Promise<number> {
+  // Garde-fou : un calendrier vide ou mal lu ne doit pas tout effacer
+  if (events.length === 0) return 0
+  // Garde-fou : on ne touche qu'à la période couverte par le calendrier publié
+  const debutCalendrier = events[0].date
+  const uids = new Set(events.map(e => e.uid))
+  const disparues = existantes.filter(s => !uids.has(s.uid_calendrier as string) && s.date >= debutCalendrier)
+  if (disparues.length === 0) return 0
+
+  const { data: paiements, error } = await supabase
+    .from('paiements').select('seance_id, statut').in('seance_id', disparues.map(s => s.id))
+  if (error) throw error
+  const statutParSeance = new Map((paiements ?? []).map(p => [p.seance_id, p.statut]))
+
+  let deleted = 0
+  for (const s of disparues) {
+    const statut = statutParSeance.get(s.id)
+    const aSupprimer = !!s.forfait_id || !statut || statut === 'pending' || statut === 'late'
+    if (!aSupprimer) continue
+    await seancesService.delete(s.id)
+    deleted++
+  }
+  return deleted
 }

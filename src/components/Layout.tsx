@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useAutoCalendarSync } from '@/hooks/useCalendarSync'
 
 const navItems = [
   { to: '/', label: 'Dashboard', shortLabel: 'Accueil', icon: '🏠' },
@@ -8,6 +9,8 @@ const navItems = [
 ]
 
 export default function Layout() {
+  useAutoCalendarSync()
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-6 sticky top-0 z-40">
