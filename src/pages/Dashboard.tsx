@@ -217,6 +217,15 @@ export default function Dashboard() {
                     <p className="text-red-600">{result.deleted} séance{result.deleted > 1 ? 's' : ''} supprimée{result.deleted > 1 ? 's' : ''} (retirée{result.deleted > 1 ? 's' : ''} du calendrier)</p>
                   )}
                   <p className="text-gray-500">{result.skipped} déjà présente{result.skipped > 1 ? 's' : ''}</p>
+                  {result.doublonsEvites > 0 && (
+                    <p className="text-gray-500">{result.doublonsEvites} séance{result.doublonsEvites > 1 ? 's' : ''} déjà saisie{result.doublonsEvites > 1 ? 's' : ''} reliée{result.doublonsEvites > 1 ? 's' : ''} au calendrier (doublon évité)</p>
+                  )}
+                  {result.doublonsAVerifier.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-orange-600 font-medium">Doublons à vérifier ({result.doublonsAVerifier.length}) — deux séances avec paiement ou forfait sur le même créneau :</p>
+                      {result.doublonsAVerifier.map((d, i) => <p key={i} className="text-gray-500 text-xs">— {d}</p>)}
+                    </div>
+                  )}
                   {result.clientsCrees.length > 0 && (
                     <div className="mt-2">
                       <p className="text-green-700 font-medium">

@@ -253,6 +253,36 @@ export interface SyncResult {
   skipped: number
   unmatched: string[]
   clientsCrees: string[]
+  doublonsEvites: number
+  doublonsAVerifier: string[]
+}
+
+// ---- Séances déjà saisies (à la main ou par un ancien calendrier) ----
+
+interface SeanceSync {
+  id: string
+  client_id: string
+  uid_calendrier: string | null
+  date: string
+  heure_debut: string | null
+  duree_minutes: number | null
+  forfait_id: string | null
+}
+
+const enMinutes = (h?: string | null) => h ? parseInt(h.slice(0, 2)) * 60 + parseInt(h.slice(3, 5)) : undefined
+
+// Même créneau : même jour et moins d'une heure d'écart (ou heure inconnue d'un côté)
+function memeCreneau(a?: string | null, b?: string | null): boolean {
+  const x = enMinutes(a), y = enMinutes(b)
+  return x === undefined || y === undefined || Math.abs(x - y) <= 60
+}
+
+// Séance sans paiement enregistré ni forfait : on peut la supprimer sans rien perdre
+async function sansSuivi(s: SeanceSync): Promise<boolean> {
+  if (s.forfait_id) return false
+  const { data, error } = await supabase.from('paiements').select('statut, montant_paye').eq('seance_id', s.id)
+  if (error) throw error
+  return (data ?? []).every(p => (p.statut === 'pending' || p.statut === 'late') && !p.montant_paye)
 }
 
 export const CALENDAR_URL_KEY = 'coachtrack_calendar_url'
@@ -295,22 +325,42 @@ async function runSync(calendarUrl: string): Promise<SyncResult> {
     `${a.date} ${a.heureDebut ?? ''}`.localeCompare(`${b.date} ${b.heureDebut ?? ''}`))
 
   // Tous les clients, archivés compris : un élève archivé qui revient n'est pas recréé en double
-  const [{ data: tousClients, error: clientsError }, forfaitsRestants, { data: existantes, error }] = await Promise.all([
+  // Toutes les séances, y compris celles saisies à la main, pour ne jamais créer de doublon
+  const [{ data: tousClients, error: clientsError }, forfaitsRestants, { data: seancesData, error }] = await Promise.all([
     supabase.from('clients').select('*'),
     forfaitsService.getRestantsParClient(),
-    supabase.from('seances').select('id, uid_calendrier, date, heure_debut, duree_minutes, forfait_id').not('uid_calendrier', 'is', null),
+    supabase.from('seances').select('id, client_id, uid_calendrier, date, heure_debut, duree_minutes, forfait_id'),
   ])
   if (clientsError) throw clientsError
   if (error) throw error
-  const parUid = new Map((existantes ?? []).map(s => [s.uid_calendrier as string, s]))
+  const toutes = (seancesData ?? []) as SeanceSync[]
+  const existantes = toutes.filter(s => s.uid_calendrier)
+  const parUid = new Map(existantes.map(s => [s.uid_calendrier as string, s]))
   const clients = tousClients as Client[]
   const actifs = clients.filter(c => c.actif)
   const archives = clients.filter(c => !c.actif)
 
-  let imported = 0, lieesForfait = 0, updated = 0, deleted = 0, skipped = 0
+  let imported = 0, lieesForfait = 0, updated = 0, deleted = 0, skipped = 0, doublonsEvites = 0
   const unmatched: string[] = []
   const clientsCrees: string[] = []
+  const doublonsAVerifier: string[] = []
   const vus = new Set<string>()
+
+  // Séance du même élève sur le même créneau qui n'est rattachée à aucun rendez-vous de ce calendrier
+  const uidsCalendrier = new Set(events.map(e => e.uid))
+  const jumelle = (clientId: string, date: string, heure: string | undefined, sauf?: SeanceSync) =>
+    toutes.find(s => s !== sauf && s.client_id === clientId && s.date === date && memeCreneau(s.heure_debut, heure)
+      && (!s.uid_calendrier || !uidsCalendrier.has(s.uid_calendrier)))
+
+  // Rattache une séance existante au rendez-vous : le calendrier fait foi pour l'heure et la durée
+  const relier = async (s: SeanceSync, event: CalendarEvent) => {
+    const heure = event.heureDebut ?? s.heure_debut
+    const duree = event.dureeMinutes ?? s.duree_minutes
+    await seancesService.update(s.id, { uid_calendrier: event.uid, heure_debut: heure as any, duree_minutes: duree as any })
+    Object.assign(s, { uid_calendrier: event.uid, heure_debut: heure, duree_minutes: duree })
+  }
+  const retirer = (s: SeanceSync) => toutes.splice(toutes.indexOf(s), 1)
+  const nomClient = (id: string) => { const c = clients.find(c => c.id === id); return c ? `${c.prenom} ${c.nom}` : 'Élève' }
 
   for (const event of events) {
     // Un même UID peut apparaître plusieurs fois (occurrences modifiées d'un événement récurrent)
@@ -324,9 +374,29 @@ async function runSync(calendarUrl: string): Promise<SyncResult> {
       const duree = event.dureeMinutes ?? null
       if (existante.date !== event.date || existante.heure_debut?.slice(0, 5) !== (heure ?? undefined) || existante.duree_minutes !== duree) {
         await seancesService.update(existante.id, { date: event.date, heure_debut: heure as any, duree_minutes: duree as any })
+        Object.assign(existante, { date: event.date, heure_debut: heure, duree_minutes: duree })
         updated++
       } else {
         skipped++
+      }
+
+      // Doublon déjà en base (séance saisie à la main en plus de l'import) : on n'en garde qu'une
+      const doublon = jumelle(existante.client_id, existante.date, event.heureDebut, existante)
+      if (doublon) {
+        if (await sansSuivi(existante)) {
+          // La séance importée n'a rien d'enregistré : la séance saisie prend sa place
+          await seancesService.delete(existante.id)
+          retirer(existante)
+          await relier(doublon, event)
+          doublonsEvites++
+        } else if (await sansSuivi(doublon)) {
+          await seancesService.delete(doublon.id)
+          retirer(doublon)
+          doublonsEvites++
+        } else {
+          // Les deux ont un paiement ou un forfait : à trancher à la main
+          doublonsAVerifier.push(`${nomClient(existante.client_id)} le ${existante.date.split('-').reverse().join('/')}`)
+        }
       }
       continue
     }
@@ -353,6 +423,14 @@ async function runSync(calendarUrl: string): Promise<SyncResult> {
       clientsCrees.push(`${client.prenom} ${client.nom}`)
     }
 
+    // Séance déjà saisie à la main (ou importée d'un ancien calendrier) : on la relie au lieu d'en créer une
+    const dejaSaisie = jumelle(client.id, event.date, event.heureDebut)
+    if (dejaSaisie) {
+      await relier(dejaSaisie, event)
+      doublonsEvites++
+      continue
+    }
+
     const tarif = client.tarif_defaut ?? 0
     const newSeance = await seancesService.create({
       client_id: client.id,
@@ -375,10 +453,11 @@ async function runSync(calendarUrl: string): Promise<SyncResult> {
     }
   }
 
-  deleted = await supprimerDisparues(events, existantes ?? [])
+  // Seulement les séances encore en base : celles fusionnées ci-dessus sont déjà supprimées
+  deleted = await supprimerDisparues(events, existantes.filter(s => toutes.includes(s)))
 
-  if (imported > 0 || updated > 0 || deleted > 0) window.dispatchEvent(new Event(CALENDAR_SYNCED_EVENT))
-  return { imported, lieesForfait, updated, deleted, skipped, unmatched, clientsCrees }
+  if (imported > 0 || updated > 0 || deleted > 0 || doublonsEvites > 0) window.dispatchEvent(new Event(CALENDAR_SYNCED_EVENT))
+  return { imported, lieesForfait, updated, deleted, skipped, unmatched, clientsCrees, doublonsEvites, doublonsAVerifier }
 }
 
 // Supprime les séances importées dont le rendez-vous a disparu du calendrier.
