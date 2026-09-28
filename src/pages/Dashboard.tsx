@@ -188,7 +188,7 @@ export default function Dashboard() {
             </div>
             <div className="px-6 py-4 flex flex-col gap-4">
               <p className="text-sm text-gray-600">
-                Colle ici l'URL de ton calendrier iCloud public. Les événements nommés <code className="bg-gray-100 px-1 rounded text-xs">[NOM Prénom]</code> seront automatiquement importés, puis resynchronisés à chaque ouverture de l'appli et toutes les 15 minutes.
+                Colle ici l'URL de ton calendrier iCloud public. Les événements nommés <code className="bg-gray-100 px-1 rounded text-xs">[NOM Prénom]</code> seront automatiquement importés (l'élève est créé s'il n'a pas encore de fiche), puis resynchronisés à chaque ouverture de l'appli et toutes les 15 minutes.
               </p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">URL du calendrier (webcal://...)</label>
@@ -217,6 +217,14 @@ export default function Dashboard() {
                     <p className="text-red-600">{result.deleted} séance{result.deleted > 1 ? 's' : ''} supprimée{result.deleted > 1 ? 's' : ''} (retirée{result.deleted > 1 ? 's' : ''} du calendrier)</p>
                   )}
                   <p className="text-gray-500">{result.skipped} déjà présente{result.skipped > 1 ? 's' : ''}</p>
+                  {result.clientsCrees.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-green-700 font-medium">
+                        Élève{result.clientsCrees.length > 1 ? 's' : ''} créé{result.clientsCrees.length > 1 ? 's' : ''} ({result.clientsCrees.length}) — tarif à compléter sur la fiche :
+                      </p>
+                      {result.clientsCrees.map((c, i) => <p key={i} className="text-gray-500 text-xs">— {c}</p>)}
+                    </div>
+                  )}
                   {result.unmatched.length > 0 && (
                     <div className="mt-2">
                       <p className="text-orange-600 font-medium">Événements non reconnus ({result.unmatched.length}) :</p>

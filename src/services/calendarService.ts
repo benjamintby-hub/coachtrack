@@ -44,10 +44,92 @@ function calcDuration(start: string, end: string): number | undefined {
   return Math.round((toMs(end) - toMs(start)) / 60000)
 }
 
+interface RawEvent {
+  UID?: string
+  SUMMARY?: string
+  DTSTART?: string
+  DTEND?: string
+  RRULE?: string
+  'RECURRENCE-ID'?: string
+  EXDATE: string[]
+}
+
+function toEvent(raw: RawEvent, uid: string): CalendarEvent {
+  return {
+    uid,
+    summary: raw.SUMMARY!,
+    date: parseDateValue(raw.DTSTART!),
+    heureDebut: parseTimeValue(raw.DTSTART!),
+    dureeMinutes: raw.DTEND ? calcDuration(raw.DTSTART!, raw.DTEND) : undefined,
+  }
+}
+
+// ---- Rendez-vous récurrents (RRULE) ----
+
+const JOURS_ICS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
+
+// Dates manipulées à midi pour ne jamais basculer de jour avec les changements d'heure
+const versDate = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d, 12) }
+const versIso = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const plusJours = (d: Date, n: number) => { const r = new Date(d); r.setDate(r.getDate() + n); return r }
+
+// Les répétitions sans fin sont dépliées jusqu'à la fin du mois prochain
+function horizonRepetitions(): string {
+  const now = new Date()
+  return versIso(new Date(now.getFullYear(), now.getMonth() + 2, 0, 12))
+}
+
+// Dates (AAAA-MM-JJ) de toutes les occurrences d'une règle, bornées par UNTIL, COUNT et l'horizon
+function occurrences(debut: string, rrule: string, horizon: string): string[] {
+  const regle = Object.fromEntries(rrule.split(';').map(p => p.split('=') as [string, string]))
+  const freq = regle.FREQ
+  const intervalle = Math.max(1, parseInt(regle.INTERVAL ?? '1') || 1)
+  const count = regle.COUNT ? parseInt(regle.COUNT) : Infinity
+  const fin = [regle.UNTIL ? parseDateValue(regle.UNTIL) : horizon, horizon].sort()[0]
+  const depart = versDate(debut)
+  const dates: string[] = []
+
+  const ajouter = (d: Date) => {
+    const iso = versIso(d)
+    if (iso < debut || iso > fin || dates.length >= count) return false
+    dates.push(iso)
+    return true
+  }
+
+  for (let k = 0; k < 5000 && dates.length < count; k++) {
+    if (freq === 'DAILY') {
+      const d = plusJours(depart, k * intervalle)
+      if (versIso(d) > fin) break
+      ajouter(d)
+    } else if (freq === 'WEEKLY') {
+      // Semaine commençant le lundi ; jours listés dans BYDAY, sinon le jour du premier rendez-vous
+      const lundi = plusJours(depart, -((depart.getDay() + 6) % 7) + k * 7 * intervalle)
+      if (versIso(lundi) > fin) break
+      const jours = regle.BYDAY
+        ? regle.BYDAY.split(',').map((j: string) => JOURS_ICS.indexOf(j.slice(-2))).filter((j: number) => j >= 0)
+        : [depart.getDay()]
+      for (const j of jours.map((j: number) => (j + 6) % 7).sort((a: number, b: number) => a - b)) ajouter(plusJours(lundi, j))
+    } else if (freq === 'MONTHLY' || freq === 'YEARLY') {
+      const mois = freq === 'MONTHLY' ? k * intervalle : k * 12 * intervalle
+      const d = new Date(depart.getFullYear(), depart.getMonth() + mois, depart.getDate(), 12)
+      if (versIso(d) > fin) break
+      // Un 31 n'existe pas tous les mois : ce mois-là est sauté
+      if (d.getDate() === depart.getDate()) ajouter(d)
+    } else {
+      // Règle non gérée : seul le premier rendez-vous est gardé
+      ajouter(depart)
+      break
+    }
+  }
+  return dates
+}
+
 function parseICS(icsText: string): CalendarEvent[] {
   const lines = unfold(icsText).split(/\r\n|\n|\r/)
-  const events: CalendarEvent[] = []
-  let cur: Record<string, string> | null = null
+  const raws: RawEvent[] = []
+  let cur: RawEvent | null = null
+  let dansAlarme = false
 
   for (const line of lines) {
     const colonIdx = line.indexOf(':')
@@ -56,21 +138,47 @@ function parseICS(icsText: string): CalendarEvent[] {
     const value = line.slice(colonIdx + 1).trim()
     const key = rawKey.split(';')[0]
 
-    if (key === 'BEGIN' && value === 'VEVENT') { cur = {} }
+    if (key === 'BEGIN' && value === 'VEVENT') { cur = { EXDATE: [] } }
     else if (key === 'END' && value === 'VEVENT') {
-      if (cur?.UID && cur?.SUMMARY && cur?.DTSTART) {
-        events.push({
-          uid: cur.UID,
-          summary: cur.SUMMARY,
-          date: parseDateValue(cur.DTSTART),
-          heureDebut: parseTimeValue(cur.DTSTART),
-          dureeMinutes: cur.DTEND ? calcDuration(cur.DTSTART, cur.DTEND) : undefined,
-        })
-      }
+      if (cur?.UID && cur?.SUMMARY && cur?.DTSTART) raws.push(cur)
       cur = null
-    } else if (cur) {
-      if (['SUMMARY', 'UID', 'DTSTART', 'DTEND'].includes(key)) cur[key] = value
+    } else if (key === 'BEGIN' && value === 'VALARM') { dansAlarme = true }
+    else if (key === 'END' && value === 'VALARM') { dansAlarme = false }
+    else if (cur && !dansAlarme) {
+      if (key === 'EXDATE') cur.EXDATE.push(...value.split(',').map(parseDateValue))
+      else if (['SUMMARY', 'UID', 'DTSTART', 'DTEND', 'RRULE', 'RECURRENCE-ID'].includes(key)) (cur as any)[key] = value
     }
+  }
+
+  // Occurrences modifiées (déplacées, renommées) : même UID que la série + date d'origine en RECURRENCE-ID
+  const modifiees = new Map<string, RawEvent>()
+  for (const r of raws) {
+    if (r['RECURRENCE-ID']) modifiees.set(`${r.UID}|${parseDateValue(r['RECURRENCE-ID'])}`, r)
+  }
+
+  const horizon = horizonRepetitions()
+  const events: CalendarEvent[] = []
+  for (const r of raws) {
+    if (r['RECURRENCE-ID']) continue
+    const debut = parseDateValue(r.DTSTART!)
+    if (!r.RRULE) { events.push(toEvent(r, r.UID!)); continue }
+
+    for (const date of occurrences(debut, r.RRULE, horizon)) {
+      if (r.EXDATE.includes(date)) continue
+      // Le premier rendez-vous garde l'UID de la série : les séances déjà importées ne sont pas dupliquées
+      const uid = date === debut ? r.UID! : `${r.UID}/${date}`
+      const cle = `${r.UID}|${date}`
+      const modifiee = modifiees.get(cle)
+      modifiees.delete(cle)
+      if (modifiee) { events.push(toEvent(modifiee, uid)); continue }
+      // Même heure et même durée que le premier rendez-vous, à la date de l'occurrence
+      events.push({ ...toEvent(r, uid), date })
+    }
+  }
+  // Occurrences modifiées dont la série n'est pas dans le calendrier : gardées telles quelles
+  for (const [cle, r] of modifiees) {
+    const date = cle.split('|')[1]
+    events.push(toEvent(r, `${r.UID}/${date}`))
   }
 
   return events
@@ -80,17 +188,61 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim()
 }
 
-function matchClient(summary: string, clients: Client[]): Client | undefined {
-  const match = summary.match(/^\[([^\]]+)\]/)
-  if (!match) return undefined
+const SALLE = /\s*-\s*SALLE\s*/i
 
-  const name = normalize(match[1].replace(/\s*-\s*SALLE\s*/i, ''))
+// Contenu entre crochets en tête du titre : « [NOM Prénom] Coaching » → « NOM Prénom »
+function nomEntreCrochets(summary: string): string | undefined {
+  return summary.match(/^\[([^\]]+)\]/)?.[1]
+}
+
+function matchClient(summary: string, clients: Client[]): Client | undefined {
+  const brut = nomEntreCrochets(summary)
+  if (!brut) return undefined
+
+  const name = normalize(brut.replace(SALLE, ''))
 
   return clients.find(c => {
     const a = normalize(`${c.nom} ${c.prenom}`)
     const b = normalize(`${c.prenom} ${c.nom}`)
     return name === a || name === b
   })
+}
+
+// Fiche d'un nouvel élève déduite de « [NOM Prénom] » (ou « [NOM Prénom - SALLE] ») :
+// les mots en majuscules forment le nom, les autres le prénom ; à défaut, le premier mot est le nom.
+function nouvelEleve(summary: string): Omit<Client, 'id' | 'created_at'> | undefined {
+  const brut = nomEntreCrochets(summary)
+  if (!brut) return undefined
+  const mots = brut.replace(SALLE, ' ').trim().split(/\s+/)
+  if (mots.length < 2) return undefined
+
+  const enMajuscules = (m: string) => /\p{L}/u.test(m) && m === m.toUpperCase()
+  const nomMots = mots.filter(enMajuscules)
+  const prenomMots = mots.filter(m => !enMajuscules(m))
+  const [nom, prenom] = nomMots.length > 0 && prenomMots.length > 0
+    ? [nomMots.join(' '), prenomMots.join(' ')]
+    : [mots[0], mots.slice(1).join(' ')]
+
+  return { nom, prenom, type: SALLE.test(brut) ? 'salle' : 'particulier', actif: true }
+}
+
+// Nombre de lettres à changer pour passer d'un mot à l'autre (distance de Levenshtein)
+function distance(a: string, b: string): number {
+  let prec = Array.from({ length: b.length + 1 }, (_, j) => j)
+  for (let i = 1; i <= a.length; i++) {
+    const ligne = [i]
+    for (let j = 1; j <= b.length; j++) {
+      ligne[j] = Math.min(prec[j] + 1, ligne[j - 1] + 1, prec[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1))
+    }
+    prec = ligne
+  }
+  return prec[b.length]
+}
+
+// Élève existant dont le nom s'écrit presque pareil (faute de frappe probable dans le calendrier)
+function clientProche(fiche: { nom: string; prenom: string }, clients: Client[]): Client | undefined {
+  const complet = normalize(`${fiche.nom} ${fiche.prenom}`)
+  return clients.find(c => distance(complet, normalize(`${c.nom} ${c.prenom}`)) <= 2)
 }
 
 export interface SyncResult {
@@ -100,6 +252,7 @@ export interface SyncResult {
   deleted: number
   skipped: number
   unmatched: string[]
+  clientsCrees: string[]
 }
 
 export const CALENDAR_URL_KEY = 'coachtrack_calendar_url'
@@ -125,8 +278,9 @@ export function syncCalendar(calendarUrl: string): Promise<SyncResult> {
 }
 
 async function runSync(calendarUrl: string): Promise<SyncResult> {
-  const proxyUrl = `/api/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`
-  const response = await fetch(proxyUrl)
+  // Une URL relative (ex. /calendrier-test.ics en mode test) est lue directement, sans proxy
+  const source = calendarUrl.startsWith('/') ? calendarUrl : `/api/calendar-proxy?url=${encodeURIComponent(calendarUrl)}`
+  const response = await fetch(source)
   if (!response.ok) {
     const detail = await response.text()
     throw new Error(`Erreur proxy (${response.status}) : ${detail}`)
@@ -140,16 +294,22 @@ async function runSync(calendarUrl: string): Promise<SyncResult> {
   const events = parseICS(icsText).sort((a, b) =>
     `${a.date} ${a.heureDebut ?? ''}`.localeCompare(`${b.date} ${b.heureDebut ?? ''}`))
 
-  const [clients, forfaitsRestants, { data: existantes, error }] = await Promise.all([
-    clientsService.getAll(),
+  // Tous les clients, archivés compris : un élève archivé qui revient n'est pas recréé en double
+  const [{ data: tousClients, error: clientsError }, forfaitsRestants, { data: existantes, error }] = await Promise.all([
+    supabase.from('clients').select('*'),
     forfaitsService.getRestantsParClient(),
     supabase.from('seances').select('id, uid_calendrier, date, heure_debut, duree_minutes, forfait_id').not('uid_calendrier', 'is', null),
   ])
+  if (clientsError) throw clientsError
   if (error) throw error
   const parUid = new Map((existantes ?? []).map(s => [s.uid_calendrier as string, s]))
+  const clients = tousClients as Client[]
+  const actifs = clients.filter(c => c.actif)
+  const archives = clients.filter(c => !c.actif)
 
   let imported = 0, lieesForfait = 0, updated = 0, deleted = 0, skipped = 0
   const unmatched: string[] = []
+  const clientsCrees: string[] = []
   const vus = new Set<string>()
 
   for (const event of events) {
@@ -171,8 +331,27 @@ async function runSync(calendarUrl: string): Promise<SyncResult> {
       continue
     }
 
-    const client = matchClient(event.summary, clients)
-    if (!client) { unmatched.push(event.summary); continue }
+    let client = matchClient(event.summary, actifs)
+    if (!client) {
+      // Élève archivé qui reprend : on le réactive plutôt que d'en créer un second
+      const archive = matchClient(event.summary, archives)
+      if (archive) {
+        client = await clientsService.update(archive.id, { actif: true })
+        archives.splice(archives.indexOf(archive), 1)
+        actifs.push(client)
+      }
+    }
+    if (!client) {
+      // Nom et prénom entre crochets sans fiche : l'élève est créé automatiquement
+      const fiche = nouvelEleve(event.summary)
+      if (!fiche) { unmatched.push(event.summary); continue }
+      // Faute de frappe probable : on ne crée pas de doublon, on signale l'événement
+      const proche = clientProche(fiche, [...actifs, ...archives])
+      if (proche) { unmatched.push(`${event.summary} (orthographe proche de ${proche.prenom} ${proche.nom} ?)`); continue }
+      client = await clientsService.create(fiche)
+      actifs.push(client)
+      clientsCrees.push(`${client.prenom} ${client.nom}`)
+    }
 
     const tarif = client.tarif_defaut ?? 0
     const newSeance = await seancesService.create({
@@ -199,7 +378,7 @@ async function runSync(calendarUrl: string): Promise<SyncResult> {
   deleted = await supprimerDisparues(events, existantes ?? [])
 
   if (imported > 0 || updated > 0 || deleted > 0) window.dispatchEvent(new Event(CALENDAR_SYNCED_EVENT))
-  return { imported, lieesForfait, updated, deleted, skipped, unmatched }
+  return { imported, lieesForfait, updated, deleted, skipped, unmatched, clientsCrees }
 }
 
 // Supprime les séances importées dont le rendez-vous a disparu du calendrier.
