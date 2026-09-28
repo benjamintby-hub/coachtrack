@@ -7,7 +7,7 @@ export default function ProtectedRoute() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-400">Chargement...</p>
+        <p className="text-faint">Chargement...</p>
       </div>
     )
   }

@@ -13,9 +13,12 @@ export default function Layout() {
   useAutoCalendarSync()
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-6 sticky top-0 z-40">
-        <span className="font-bold text-blue-600 text-lg">CoachTrack</span>
+    <div className="min-h-screen bg-surface text-ink flex flex-col">
+      <header className="materiau border-b border-white/10 px-4 py-3 flex items-center gap-6 sticky top-0 z-40">
+        <span className="font-display font-bold tracking-tight text-ink text-lg">CoachTrack</span>
+        {import.meta.env.MODE === 'test' && (
+          <span className="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded">BASE DE TEST</span>
+        )}
         {/* Menu du haut : ordinateur / tablette */}
         <nav className="hidden md:flex gap-4">
           {navItems.map((item) => (
@@ -26,8 +29,8 @@ export default function Layout() {
               className={({ isActive }) =>
                 `text-sm font-medium px-3 py-1.5 rounded-md transition-colors flex items-center gap-2 ${
                   isActive
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-accent/12 text-accent'
+                    : 'text-muted hover:text-ink'
                 }`
               }
             >
@@ -41,7 +44,7 @@ export default function Layout() {
         <Outlet />
       </main>
       {/* Barre d'onglets du bas : téléphone */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 grid grid-cols-4 z-40 pb-[env(safe-area-inset-bottom)]">
+      <nav className="materiau md:hidden fixed bottom-0 inset-x-0 border-t border-white/10 grid grid-cols-4 z-40 pb-[env(safe-area-inset-bottom)]">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -49,7 +52,7 @@ export default function Layout() {
             end={item.to === '/'}
             className={({ isActive }) =>
               `flex flex-col items-center gap-0.5 py-2 text-xs font-medium ${
-                isActive ? 'text-blue-600' : 'text-gray-500'
+                isActive ? 'text-accent' : 'text-muted'
               }`
             }
           >

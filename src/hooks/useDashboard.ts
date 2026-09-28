@@ -13,6 +13,8 @@ export interface DashboardStats {
   nbSeancesSalle: number
   nbSeancesParticulier: number
   nbImpayés: number
+  // CA encaissé du mois précédent, pour afficher l'évolution
+  caMoisPrecedent: number
 }
 
 export type VueSeances = 'mois' | 'semaine' | 'jour'
@@ -28,6 +30,26 @@ function bornesVue(vue: Exclude<VueSeances, 'mois'>): [string, string] {
   return [toISODate(lundi), toISODate(dimanche)]
 }
 
+// CA encaissé sur une période : paiements reçus des séances réalisées + forfaits achetés
+async function caEncaissePeriode(debut: string, fin: string): Promise<number> {
+  const [{ data: seances }, achats] = await Promise.all([
+    supabase
+      .from('seances')
+      .select('paiements(statut, montant_paye)')
+      .gte('date', debut)
+      .lte('date', fin)
+      .eq('statut_seance', 'done'),
+    forfaitsService.getAchatsPeriode(debut, fin),
+  ])
+  let ca = 0
+  for (const s of seances ?? []) {
+    const p = (s as any).paiements?.[0]
+    if (p && (p.statut === 'paid' || p.statut === 'partial')) ca += p.montant_paye
+  }
+  for (const f of achats) ca += f.prix_total ?? 0
+  return ca
+}
+
 export function useDashboard(mois: number, annee: number, refreshKey = 0, vue: VueSeances = 'mois') {
   const [stats, setStats] = useState<DashboardStats>({
     caEncaisse: 0,
@@ -39,6 +61,7 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0, vue: V
     nbSeancesSalle: 0,
     nbSeancesParticulier: 0,
     nbImpayés: 0,
+    caMoisPrecedent: 0,
   })
   const [seancesMois, setSeancesMois] = useState<any[]>([])
   const [seancesPeriode, setSeancesPeriode] = useState<any[]>([])
@@ -50,6 +73,11 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0, vue: V
 
       const debut = `${annee}-${String(mois).padStart(2, '0')}-01`
       const fin = toISODate(new Date(annee, mois, 0))
+      // Lancé en parallèle : le mois précédent sert de point de comparaison
+      const caPrecedent = caEncaissePeriode(
+        toISODate(new Date(annee, mois - 2, 1)),
+        toISODate(new Date(annee, mois - 1, 0)),
+      ).catch(() => 0) // sans comparaison plutôt que sans tableau de bord
 
       // Séances du mois
       const { data: seances } = await supabase
@@ -103,7 +131,8 @@ export function useDashboard(mois: number, annee: number, refreshKey = 0, vue: V
         else caEncaisseParticulier += montant
       }
 
-      setStats({ caEncaisse, caEncaisseSalle, caEncaisseParticulier, enAttente, enRetard, nbSeances, nbSeancesSalle, nbSeancesParticulier, nbImpayés })
+      const caMoisPrecedent = await caPrecedent
+      setStats({ caEncaisse, caEncaisseSalle, caEncaisseParticulier, enAttente, enRetard, nbSeances, nbSeancesSalle, nbSeancesParticulier, nbImpayés, caMoisPrecedent })
       setSeancesMois(seances.slice(0, 8))
       setLoading(false)
     }

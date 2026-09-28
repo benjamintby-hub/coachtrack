@@ -6,6 +6,7 @@ import { usePaiements } from '@/hooks/usePaiements'
 import SeanceForm, { type SeanceFormData } from '@/components/SeanceForm'
 import ClientBadge from '@/components/ClientBadge'
 import PaymentBadge from '@/components/PaymentBadge'
+import { StatutSelect } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import type { ClientType } from '@/types'
 
@@ -53,12 +54,12 @@ export default function Seances() {
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Séances</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{seances.length} séance{seances.length > 1 ? 's' : ''} enregistrée{seances.length > 1 ? 's' : ''}</p>
+          <h1 className="text-2xl font-bold text-ink">Séances</h1>
+          <p className="text-muted text-sm mt-0.5">{seances.length} séance{seances.length > 1 ? 's' : ''} enregistrée{seances.length > 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          className="bg-accent text-accent-ink px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent2 transition-colors"
         >
           + Nouvelle séance
         </button>
@@ -71,7 +72,7 @@ export default function Seances() {
             key={f}
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filter === f ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
+              filter === f ? 'bg-accent text-accent-ink' : 'bg-card text-muted border border-hair hover:border-hair'
             }`}
           >
             {f === 'tous' ? 'Toutes' : f === 'salle' ? 'Salle' : 'Particuliers'}
@@ -79,13 +80,13 @@ export default function Seances() {
         ))}
       </div>
 
-      {loading && <p className="text-gray-400 text-sm">Chargement...</p>}
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {loading && <p className="text-faint text-sm">Chargement...</p>}
+      {error && <p className="text-late text-sm">{error}</p>}
 
       {!loading && filtered.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-faint">
           <p>Aucune séance enregistrée.</p>
-          <button onClick={() => setShowForm(true)} className="mt-2 text-blue-600 text-sm hover:underline">
+          <button onClick={() => setShowForm(true)} className="mt-2 text-accent text-sm hover:underline">
             Ajouter la première séance
           </button>
         </div>
@@ -96,50 +97,42 @@ export default function Seances() {
         {filtered.map(seance => {
           const paiement = paiements.find(p => p.seance_id === seance.id)
           return (
-            <div key={seance.id} className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4">
-              <div className="text-sm text-gray-500 w-24 shrink-0">{formatDate(seance.date)}</div>
+            <div key={seance.id} className="bg-card border border-hair rounded-xl px-4 py-3 flex items-center gap-4">
+              <div className="text-sm text-muted w-24 shrink-0">{formatDate(seance.date)}</div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-ink">
                     {seance.clients?.prenom} {seance.clients?.nom}
                   </span>
                   <ClientBadge type={seance.type} />
-                  <span className="text-xs text-gray-400">{statutSeanceLabels[seance.statut_seance]}</span>
+                  <span className="text-xs text-faint">{statutSeanceLabels[seance.statut_seance]}</span>
                 </div>
-                {seance.notes && <p className="text-xs text-gray-400 mt-0.5 truncate">{seance.notes}</p>}
+                {seance.notes && <p className="text-xs text-faint mt-0.5 truncate">{seance.notes}</p>}
               </div>
               <div className="flex items-center gap-3 shrink-0">
-                <span className="text-sm font-medium text-gray-700">{formatCurrency(seance.tarif)}</span>
+                <span className="text-sm font-medium text-ink2">{formatCurrency(seance.tarif)}</span>
                 {paiement?.mode && (
-                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                  <span className="text-xs text-muted bg-white/8 px-2 py-0.5 rounded-full">
                     {modeLabels[paiement.mode] ?? paiement.mode}
                   </span>
                 )}
                 {paiement && (
-                  <select
-                    value={paiement.statut}
-                    onChange={e => updatePaiementStatut(paiement.id, e.target.value as any)}
-                    className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  >
-                    <option value="pending">En attente</option>
-                    <option value="paid">Payé</option>
-                    <option value="partial">Partiel</option>
-                    <option value="late">En retard</option>
-                    <option value="offered">Offert</option>
-                    <option value="cancelled">Annulé</option>
-                  </select>
+                  <StatutSelect
+                    statut={paiement.statut}
+                    onChange={statut => updatePaiementStatut(paiement.id, statut)}
+                  />
                 )}
                 {paiement && <PaymentBadge statut={paiement.statut} />}
               </div>
               <button
                 onClick={() => setEditing(seance)}
-                className="text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 transition-colors shrink-0"
+                className="text-xs text-muted hover:text-accent px-2 py-1 rounded hover:bg-accent/12 transition-colors shrink-0"
               >
                 Modifier
               </button>
               <button
                 onClick={() => setConfirmDelete(seance.id)}
-                className="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors shrink-0"
+                className="text-xs text-muted hover:text-late px-2 py-1 rounded hover:bg-late/15 transition-colors shrink-0"
               >
                 Supprimer
               </button>
@@ -158,14 +151,14 @@ export default function Seances() {
       {/* Confirmation suppression */}
       {confirmDelete && (
         <Modal title="Supprimer cette séance ?" onClose={() => setConfirmDelete(null)}>
-          <p className="text-gray-600 text-sm mb-4">La séance et son paiement associé seront définitivement supprimés.</p>
+          <p className="text-muted text-sm mb-4">La séance et son paiement associé seront définitivement supprimés.</p>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
+            <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-sm text-muted hover:text-ink">
               Annuler
             </button>
             <button
               onClick={async () => { await deleteSeance(confirmDelete); setConfirmDelete(null) }}
-              className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+              className="px-4 py-2 bg-late text-late-ink text-sm rounded-lg hover:bg-late2"
             >
               Supprimer
             </button>
@@ -191,11 +184,11 @@ export default function Seances() {
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-xl shadow-xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-hair">
+          <h2 className="font-semibold text-ink">{title}</h2>
+          <button onClick={onClose} aria-label="Fermer" className="text-faint hover:text-muted"><X size={20} /></button>
         </div>
         <div className="px-6 py-4">{children}</div>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Select from '@/components/Select'
 import type { Client, ClientType, PaymentMode } from '@/types'
 
 interface Props {
@@ -54,12 +55,13 @@ export default function ClientForm({ initial, onSubmit, onCancel }: Props) {
 
   const field = (label: string, children: React.ReactNode) => (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-ink2 mb-1">{label}</label>
       {children}
     </div>
   )
 
-  const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const inputClass = "w-full border border-hair rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+  const selectClass = "w-full flex items-center justify-between gap-2 bg-field border border-hair rounded-lg px-3 py-2 text-sm text-ink hover:border-white/20 transition-colors"
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -82,9 +84,9 @@ export default function ClientForm({ initial, onSubmit, onCancel }: Props) {
                 value={t}
                 checked={form.type === t}
                 onChange={() => setForm(f => ({ ...f, type: t }))}
-                className="accent-blue-600"
+                className="accent-accent"
               />
-              <span className="text-sm text-gray-700">{t === 'salle' ? 'Salle' : 'Particulier'}</span>
+              <span className="text-sm text-ink2">{t === 'salle' ? 'Salle' : 'Particulier'}</span>
             </label>
           ))}
         </div>
@@ -104,12 +106,13 @@ export default function ClientForm({ initial, onSubmit, onCancel }: Props) {
           <input className={inputClass} type="number" min="0" step="0.01" value={form.tarif_defaut} onChange={e => setForm(f => ({ ...f, tarif_defaut: e.target.value }))} placeholder="50" />
         ))}
         {field('Mode de paiement préféré', (
-          <select className={inputClass} value={form.mode_paiement_defaut} onChange={e => setForm(f => ({ ...f, mode_paiement_defaut: e.target.value as PaymentMode }))}>
-            <option value="">— Non défini —</option>
-            {Object.entries(modeLabels).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
+          <Select
+            value={form.mode_paiement_defaut}
+            options={[{ value: '', label: 'Non défini' }, ...Object.entries(modeLabels).map(([value, label]) => ({ value, label }))]}
+            onChange={v => setForm(f => ({ ...f, mode_paiement_defaut: v as PaymentMode }))}
+            ariaLabel="Mode de paiement préféré"
+            className={selectClass}
+          />
         ))}
       </div>
 
@@ -117,13 +120,13 @@ export default function ClientForm({ initial, onSubmit, onCancel }: Props) {
         <textarea className={inputClass} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Informations supplémentaires..." />
       ))}
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && <p className="text-late text-sm">{error}</p>}
 
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-muted hover:text-ink">
           Annuler
         </button>
-        <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+        <button type="submit" disabled={loading} className="px-4 py-2 bg-accent text-accent-ink text-sm rounded-lg hover:bg-accent2 disabled:opacity-50">
           {loading ? 'Enregistrement...' : 'Enregistrer'}
         </button>
       </div>

@@ -98,10 +98,13 @@ export function useStats(annee: number) {
       const totalCash = ca12mois.reduce((acc, m) => acc + m.cash, 0)
       const totalTransfer = ca12mois.reduce((acc, m) => acc + m.transfer, 0)
       const totalForfaits = ca12mois.reduce((acc, m) => acc + m.forfait, 0)
+      const totalCA = ca12mois.reduce((acc, m) => acc + m.total, 0)
       const repartition = [
-        { name: 'Espèces', value: Math.round(totalCash), color: '#10b981' },
-        { name: 'Virement', value: Math.round(totalTransfer), color: '#3b82f6' },
-        { name: 'Forfaits', value: Math.round(totalForfaits), color: '#8b5cf6' },
+        { name: 'Espèces', value: Math.round(totalCash), color: '#d8c7a2' },
+        { name: 'Virement', value: Math.round(totalTransfer), color: '#9cc5a1' },
+        { name: 'Forfaits', value: Math.round(totalForfaits), color: '#9db9d6' },
+        // Reste encaissé sans moyen de paiement renseigné
+        { name: 'Non précisé', value: Math.round(totalCA - totalCash - totalTransfer - totalForfaits), color: '#5c6966' },
       ]
 
       // Taux annulation global
@@ -138,7 +141,7 @@ export function useStats(annee: number) {
       }
       const delaiMoyenPaiement = delais.length > 0 ? Math.round(delais.reduce((a, b) => a + b, 0) / delais.length) : 0
 
-      const totalAnnee = ca12mois.reduce((acc, m) => acc + m.total, 0)
+      const totalAnnee = totalCA
 
       setStats({ ca12mois, topClients, annulationsParClient, repartition, tauxAnnulation, delaiMoyenPaiement, totalAnnee, totalCash, totalTransfer, totalForfaits })
       setLoading(false)

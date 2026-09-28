@@ -27,12 +27,12 @@ export default function Clients() {
       {/* En-tête */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{clients.length} client{clients.length > 1 ? 's' : ''} actif{clients.length > 1 ? 's' : ''}</p>
+          <h1 className="font-display text-2xl font-bold tracking-tight text-ink">Clients</h1>
+          <p className="text-muted text-sm mt-0.5">{clients.length} client{clients.length > 1 ? 's' : ''} actif{clients.length > 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+          className="bg-accent text-accent-ink px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent2 transition-colors"
         >
           + Nouveau client
         </button>
@@ -45,7 +45,7 @@ export default function Clients() {
             key={f}
             onClick={() => setFilter(f)}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              filter === f ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-300'
+              filter === f ? 'bg-accent text-accent-ink' : 'bg-card text-muted border border-hair hover:border-hair'
             }`}
           >
             {f === 'tous' ? 'Tous' : f === 'salle' ? 'Salle' : 'Particuliers'}
@@ -54,14 +54,14 @@ export default function Clients() {
       </div>
 
       {/* États */}
-      {loading && <p className="text-gray-400 text-sm">Chargement...</p>}
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {loading && <p className="text-faint text-sm">Chargement...</p>}
+      {error && <p className="text-late text-sm">{error}</p>}
 
       {/* Liste */}
       {!loading && filtered.length === 0 && (
-        <div className="text-center py-12 text-gray-400">
+        <div className="text-center py-12 text-faint">
           <p>Aucun client pour l'instant.</p>
-          <button onClick={() => setShowForm(true)} className="mt-2 text-blue-600 text-sm hover:underline">
+          <button onClick={() => setShowForm(true)} className="mt-2 text-accent text-sm hover:underline">
             Ajouter le premier client
           </button>
         </div>
@@ -72,22 +72,22 @@ export default function Clients() {
           <button
             key={client.id}
             onClick={() => navigate(`/clients/${client.id}`)}
-            className="bg-white border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-4 hover:border-blue-300 hover:shadow-sm transition-all text-left w-full"
+            className="bg-card border border-hair rounded-xl px-4 py-3 flex items-center gap-4 hover:border-accent/40 hover:shadow-sm transition-all text-left w-full"
           >
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-medium text-gray-900">{client.prenom} {client.nom}</span>
+                <span className="font-medium text-ink">{client.prenom} {client.nom}</span>
                 <ClientBadge type={client.type} />
               </div>
               <div className="flex flex-wrap gap-x-4 mt-0.5">
-                {client.email && <span className="text-xs text-gray-400">{client.email}</span>}
-                {client.telephone && <span className="text-xs text-gray-400">{client.telephone}</span>}
+                {client.email && <span className="text-xs text-faint">{client.email}</span>}
+                {client.telephone && <span className="text-xs text-faint">{client.telephone}</span>}
               </div>
             </div>
             {client.tarif_defaut && (
-              <span className="text-sm font-medium text-gray-700 shrink-0">{formatCurrency(client.tarif_defaut)}<span className="hidden sm:inline">/séance</span></span>
+              <span className="text-sm font-medium text-ink2 shrink-0">{formatCurrency(client.tarif_defaut)}<span className="hidden sm:inline">/séance</span></span>
             )}
-            <ChevronRight size={18} className="text-gray-300 shrink-0" aria-hidden="true" />
+            <ChevronRight size={18} className="text-faint shrink-0" aria-hidden="true" />
           </button>
         ))}
       </div>
@@ -105,11 +105,11 @@ export default function Clients() {
 
 function Modal({ title, children, onClose }: { title: string; children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="font-semibold text-gray-900">{title}</h2>
-          <button onClick={onClose} aria-label="Fermer" className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-card rounded-xl shadow-xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-hair">
+          <h2 className="font-semibold text-ink">{title}</h2>
+          <button onClick={onClose} aria-label="Fermer" className="text-faint hover:text-muted"><X size={20} /></button>
         </div>
         <div className="px-6 py-4">{children}</div>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Select from '@/components/Select'
 import type { Client, Seance, SeanceStatus } from '@/types'
 
 export type SeanceFormData = Omit<Seance, 'id' | 'created_at'> & { moyen_paiement?: string }
@@ -68,11 +69,12 @@ export default function SeanceForm({ clients, initial, initialMoyenPaiement, onS
     }
   }
 
-  const inputClass = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const inputClass = "w-full border border-hair rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+  const selectClass = "w-full flex items-center justify-between gap-2 bg-field border border-hair rounded-lg px-3 py-2 text-sm text-ink hover:border-white/20 transition-colors"
 
   const field = (label: string, children: React.ReactNode) => (
     <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-ink2 mb-1">{label}</label>
       {children}
     </div>
   )
@@ -80,12 +82,13 @@ export default function SeanceForm({ clients, initial, initialMoyenPaiement, onS
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       {field('Client *', (
-        <select className={inputClass} value={form.client_id} onChange={e => handleClientChange(e.target.value)} required>
-          <option value="">— Sélectionner un client —</option>
-          {clients.map(c => (
-            <option key={c.id} value={c.id}>{c.prenom} {c.nom} ({c.type})</option>
-          ))}
-        </select>
+        <Select
+          value={form.client_id}
+          options={[{ value: '', label: 'Sélectionner un client' }, ...clients.map(c => ({ value: c.id, label: `${c.prenom} ${c.nom} (${c.type})` }))]}
+          onChange={handleClientChange}
+          ariaLabel="Client"
+          className={selectClass}
+        />
       ))}
 
       <div className="grid grid-cols-2 gap-4">
@@ -107,30 +110,34 @@ export default function SeanceForm({ clients, initial, initialMoyenPaiement, onS
       </div>
 
       {field('Statut de la séance', (
-        <select className={inputClass} value={form.statut_seance} onChange={e => setForm(f => ({ ...f, statut_seance: e.target.value as SeanceStatus }))}>
-          {Object.entries(statutLabels).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
+        <Select
+          value={form.statut_seance}
+          options={Object.entries(statutLabels).map(([value, label]) => ({ value, label }))}
+          onChange={v => setForm(f => ({ ...f, statut_seance: v as SeanceStatus }))}
+          ariaLabel="Statut de la séance"
+          className={selectClass}
+        />
       ))}
 
       {field('Moyen de paiement', (
-        <select className={inputClass} value={form.moyen_paiement} onChange={e => setForm(f => ({ ...f, moyen_paiement: e.target.value }))}>
-          <option value="">— Non précisé —</option>
-          <option value="cash">Espèces</option>
-          <option value="transfer">Virement</option>
-        </select>
+        <Select
+          value={form.moyen_paiement}
+          options={[{ value: '', label: 'Non précisé' }, { value: 'cash', label: 'Espèces' }, { value: 'transfer', label: 'Virement' }]}
+          onChange={v => setForm(f => ({ ...f, moyen_paiement: v }))}
+          ariaLabel="Moyen de paiement"
+          className={selectClass}
+        />
       ))}
 
       {field('Notes', (
         <textarea className={inputClass} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={2} placeholder="Remarques..." />
       ))}
 
-      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {error && <p className="text-late text-sm">{error}</p>}
 
       <div className="flex justify-end gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900">Annuler</button>
-        <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-muted hover:text-ink">Annuler</button>
+        <button type="submit" disabled={loading} className="px-4 py-2 bg-accent text-accent-ink text-sm rounded-lg hover:bg-accent2 disabled:opacity-50">
           {loading ? 'Enregistrement...' : 'Enregistrer'}
         </button>
       </div>
