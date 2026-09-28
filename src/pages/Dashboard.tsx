@@ -173,7 +173,6 @@ export default function Dashboard() {
                             {[
                               !seance.forfait_id && formatCurrency(seance.tarif),
                               vue !== 'jour' && heure,
-                              seance.type === 'salle' ? 'Salle' : 'Particulier',
                             ].filter(Boolean).join(' · ')}
                           </p>
                         </div>

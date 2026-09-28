@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { ChevronRight, X } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useClients } from '@/hooks/useClients'
-import ClientBadge from '@/components/ClientBadge'
 import ClientForm from '@/components/ClientForm'
 import { formatCurrency } from '@/utils/formatters'
 import type { Client, ClientType } from '@/types'
@@ -77,7 +76,6 @@ export default function Clients() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-medium text-ink">{client.prenom} {client.nom}</span>
-                <ClientBadge type={client.type} />
               </div>
               <div className="flex flex-wrap gap-x-4 mt-0.5">
                 {client.email && <span className="text-xs text-faint">{client.email}</span>}

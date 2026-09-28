@@ -15,7 +15,12 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-surface text-ink flex flex-col">
       <header className="materiau border-b border-white/10 px-4 py-3 flex items-center gap-6 sticky top-0 z-40">
-        <span className="font-display font-bold tracking-tight text-ink text-lg">CoachTrack</span>
+        <span className="flex items-center gap-2 font-display font-bold tracking-tight text-ink text-lg">
+          <svg width="22" height="22" viewBox="0 0 48 48" fill="none" stroke="var(--color-accent)" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M36 15.5A13 13 0 1 0 29.5 36.2L46 17" />
+          </svg>
+          CoachTrack
+        </span>
         {import.meta.env.MODE === 'test' && (
           <span className="text-xs font-bold text-white bg-red-500 px-2 py-0.5 rounded">BASE DE TEST</span>
         )}

@@ -5,7 +5,6 @@ import { clientsService } from '@/services/clientsService'
 import { seancesService } from '@/services/seancesService'
 import { paiementsService } from '@/services/paiementsService'
 import { forfaitsService } from '@/services/forfaitsService'
-import ClientBadge from '@/components/ClientBadge'
 import ClientForm from '@/components/ClientForm'
 import Select from '@/components/Select'
 import SeanceForm, { type SeanceFormData } from '@/components/SeanceForm'
@@ -242,7 +241,6 @@ export default function ClientDetail() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="font-display text-2xl font-bold tracking-tight text-ink">{client.prenom} {client.nom}</h1>
-              <ClientBadge type={client.type} />
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-sm text-muted">
               {client.tarif_defaut && <span className="tabular-nums">{formatCurrency(client.tarif_defaut)} / séance</span>}
