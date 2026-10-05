@@ -345,7 +345,7 @@ export default function ClientDetail() {
           </div>
         ) : (
           <p className="text-sm text-faint mt-2">
-            {forfaits.length > 0 ? 'Forfait terminé. Tu peux en créer un nouveau.' : 'Aucun forfait actif pour ce client.'}
+            {forfaits.length > 0 ? 'Forfait terminé.' : 'Aucun forfait actif pour ce client.'}
           </p>
         )}
 
