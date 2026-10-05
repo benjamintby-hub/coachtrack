@@ -4,7 +4,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { clientsService } from '@/services/clientsService'
 import { seancesService } from '@/services/seancesService'
 import { paiementsService } from '@/services/paiementsService'
-import { forfaitsService } from '@/services/forfaitsService'
+import { forfaitsService, type ForfaitAvecUsage } from '@/services/forfaitsService'
 import ClientForm from '@/components/ClientForm'
 import Select from '@/components/Select'
 import SeanceForm, { type SeanceFormData } from '@/components/SeanceForm'
@@ -12,7 +12,7 @@ import { Avatar, DateBlock, StatutSelect, ModeSelect } from '@/components/ui'
 import { formatCurrency, formatDate } from '@/utils/formatters'
 import { supabase } from '@/lib/supabase'
 import { CALENDAR_SYNCED_EVENT } from '@/services/calendarService'
-import type { Client, Forfait, PaymentStatus } from '@/types'
+import type { Client, PaymentStatus } from '@/types'
 
 const moisLabels = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 const STATUTS_A_REGLER: PaymentStatus[] = ['pending', 'late', 'partial']
@@ -34,7 +34,8 @@ export default function ClientDetail() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [client, setClient] = useState<Client | null>(null)
   const [seances, setSeances] = useState<any[]>([])
-  const [forfait, setForfait] = useState<Forfait | null>(null)
+  const [forfaits, setForfaits] = useState<ForfaitAvecUsage[]>([])
+  const [forfaitEdite, setForfaitEdite] = useState<ForfaitAvecUsage | null>(null)
   const [loading, setLoading] = useState(true)
   const [showSeanceForm, setShowSeanceForm] = useState(false)
   const [useForfait, setUseForfait] = useState(false)
@@ -45,7 +46,7 @@ export default function ClientDetail() {
   const [confirmArchive, setConfirmArchive] = useState(false)
   const [showForfaitForm, setShowForfaitForm] = useState(false)
   const [forfaitForm, setForfaitForm] = useState(defaultForfaitForm)
-  const [confirmDeleteForfait, setConfirmDeleteForfait] = useState(false)
+  const [confirmDeleteForfait, setConfirmDeleteForfait] = useState<ForfaitAvecUsage | null>(null)
   // Par défaut le mois précédent (règlement mensuel en début de mois)
   const [moisReglement, setMoisReglement] = useState<string | null>(null)
   const [reglementEnCours, setReglementEnCours] = useState(false)
@@ -53,13 +54,13 @@ export default function ClientDetail() {
   const load = async (silent = false) => {
     if (!id) return
     if (!silent) setLoading(true)
-    const [clientData, seancesRaw, forfaitData] = await Promise.all([
+    const [clientData, seancesRaw, forfaitsData] = await Promise.all([
       clientsService.getById(id),
       seancesService.getByClient(id),
       forfaitsService.getByClient(id),
     ])
     setClient(clientData)
-    setForfait(forfaitData)
+    setForfaits(forfaitsData)
 
     const ids = (seancesRaw ?? []).map((s: any) => s.id)
     let pMap: Record<string, any> = {}
@@ -168,7 +169,8 @@ export default function ClientDetail() {
     navigate('/clients')
   }
 
-  const openForfaitForm = (existing?: Forfait) => {
+  const openForfaitForm = (existing?: ForfaitAvecUsage) => {
+    setForfaitEdite(existing ?? null)
     setForfaitForm(existing ? {
       nb_seances: String(existing.nb_seances),
       prix_total: existing.prix_total != null ? String(existing.prix_total) : '',
@@ -185,19 +187,20 @@ export default function ClientDetail() {
       prix_total: forfaitForm.prix_total ? parseFloat(forfaitForm.prix_total) : undefined,
       date_achat: forfaitForm.date_achat,
     }
-    if (forfait) {
-      await forfaitsService.update(forfait.id, payload)
+    if (forfaitEdite) {
+      await forfaitsService.update(forfaitEdite.id, payload)
     } else {
       await forfaitsService.create(payload)
     }
     setShowForfaitForm(false)
+    setForfaitEdite(null)
     await load()
   }
 
   const handleDeleteForfait = async () => {
-    if (!forfait) return
-    await forfaitsService.delete(forfait.id)
-    setConfirmDeleteForfait(false)
+    if (!confirmDeleteForfait) return
+    await forfaitsService.delete(confirmDeleteForfait.id)
+    setConfirmDeleteForfait(null)
     await load()
   }
 
@@ -205,7 +208,9 @@ export default function ClientDetail() {
   if (!client) return <div className="p-6"><p className="text-late text-sm">Client introuvable.</p></div>
 
   const seancesDone = seances.filter(s => s.statut_seance === 'done')
-  const caTotal = seancesDone.reduce((acc, s) => acc + (s.paiements?.[0]?.montant_paye ?? 0), 0) + (forfait?.prix_total ?? 0)
+  // Tous les forfaits achetés comptent dans le CA, pas seulement le dernier
+  const caTotal = seancesDone.reduce((acc, s) => acc + (s.paiements?.[0]?.montant_paye ?? 0), 0)
+    + forfaits.reduce((acc, f) => acc + (f.prix_total ?? 0), 0)
   const enAttente = seances.reduce((acc, s) => {
     const p = s.paiements?.[0]
     if (!p || p.statut === 'paid' || p.statut === 'cancelled' || p.statut === 'offered') return acc
@@ -216,10 +221,12 @@ export default function ClientDetail() {
     return p && (p.statut === 'pending' || p.statut === 'late')
   }).length
 
-  // Forfait stats
-  const nbUtilisees = forfait ? seances.filter(s => s.forfait_id === forfait.id && s.statut_seance === 'done').length : 0
-  const nbRestantes = forfait ? forfait.nb_seances - nbUtilisees : 0
-  const pctUtilise = forfait ? Math.round((nbUtilisees / forfait.nb_seances) * 100) : 0
+  // Forfait en cours : le plus récent qui a encore des séances. Les autres forment l'historique.
+  const forfait = forfaits.find(f => f.restantes > 0) ?? null
+  const forfaitsTermines = forfaits.filter(f => f !== forfait)
+  const nbUtilisees = forfait?.utilisees ?? 0
+  const nbRestantes = forfait?.restantes ?? 0
+  const pctUtilise = forfait ? Math.min(100, Math.round((nbUtilisees / forfait.nb_seances) * 100)) : 0
   const restantesCouleur = nbRestantes <= 1 ? 'text-late' : nbRestantes <= 3 ? 'text-wait' : 'text-accent2'
 
   const btnSecondaire = 'h-9 w-9 flex items-center justify-center rounded-full text-muted bg-white/8 hover:bg-white/15 hover:text-ink transition active:scale-[0.95]'
@@ -305,12 +312,14 @@ export default function ClientDetail() {
               <button onClick={() => openForfaitForm(forfait)} aria-label="Modifier le forfait" title="Modifier le forfait" className={btnSecondaire}>
                 <Pencil size={16} aria-hidden="true" />
               </button>
-              <button onClick={() => setConfirmDeleteForfait(true)} aria-label="Supprimer le forfait" title="Supprimer le forfait" className={btnSecondaire}>
+              <button onClick={() => setConfirmDeleteForfait(forfait)} aria-label="Supprimer le forfait" title="Supprimer le forfait" className={btnSecondaire}>
                 <Trash2 size={16} aria-hidden="true" />
               </button>
             </div>
           ) : (
-            <button onClick={() => openForfaitForm()} className="h-8 px-3 rounded-full text-sm font-medium text-accent bg-accent/12 hover:bg-accent/20 transition active:scale-[0.97]">+ Créer un forfait</button>
+            <button onClick={() => openForfaitForm()} className="h-8 px-3 rounded-full text-sm font-medium text-accent bg-accent/12 hover:bg-accent/20 transition active:scale-[0.97]">
+              {forfaits.length > 0 ? '+ Nouveau forfait' : '+ Créer un forfait'}
+            </button>
           )}
         </div>
 
@@ -329,13 +338,48 @@ export default function ClientDetail() {
               />
             </div>
             <p className="text-xs text-faint mt-2 tabular-nums">
-              {forfait.nb_seances} séances
+              {forfait.nb_seances} séance{forfait.nb_seances > 1 ? 's' : ''}
               {forfait.prix_total != null && ` · ${formatCurrency(forfait.prix_total)}`}
               {` · acheté le ${formatDate(forfait.date_achat)}`}
             </p>
           </div>
         ) : (
-          <p className="text-sm text-faint mt-2">Aucun forfait actif pour ce client.</p>
+          <p className="text-sm text-faint mt-2">
+            {forfaits.length > 0 ? 'Forfait terminé. Tu peux en créer un nouveau.' : 'Aucun forfait actif pour ce client.'}
+          </p>
+        )}
+
+        {/* Historique : les forfaits épuisés restent, ils portent les séances déjà payées */}
+        {forfaitsTermines.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-hair">
+            <p className="text-xs font-medium text-muted mb-2">Forfaits précédents</p>
+            <ul className="flex flex-col gap-1.5">
+              {forfaitsTermines.map(f => (
+                <li key={f.id} className="flex items-center gap-3 text-sm">
+                  <span className="flex-1 text-ink2 tabular-nums">
+                    {f.nb_seances} séance{f.nb_seances > 1 ? 's' : ''}
+                    {f.prix_total != null && ` · ${formatCurrency(f.prix_total)}`}
+                    {` · ${formatDate(f.date_achat)}`}
+                  </span>
+                  <span className="text-xs text-faint tabular-nums shrink-0">{f.utilisees}/{f.nb_seances} utilisées</span>
+                  <button
+                    onClick={() => openForfaitForm(f)}
+                    aria-label={`Modifier le forfait du ${formatDate(f.date_achat)}`}
+                    className="h-7 w-7 flex items-center justify-center rounded-full text-faint hover:bg-white/8 hover:text-ink2 transition shrink-0"
+                  >
+                    <Pencil size={14} aria-hidden="true" />
+                  </button>
+                  <button
+                    onClick={() => setConfirmDeleteForfait(f)}
+                    aria-label={`Supprimer le forfait du ${formatDate(f.date_achat)}`}
+                    className="h-7 w-7 flex items-center justify-center rounded-full text-faint hover:bg-late/15 hover:text-late transition shrink-0"
+                  >
+                    <Trash2 size={14} aria-hidden="true" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
 
@@ -357,7 +401,7 @@ export default function ClientDetail() {
           <ul className="divide-y divide-hair">
             {seances.map(seance => {
               const paiement = seance.paiements?.[0]
-              const lieeAuForfait = forfait && seance.forfait_id === forfait.id
+              const lieeAuForfait = !!seance.forfait_id
               const heure = seance.heure_debut?.slice(0, 5)
               return (
                 <li key={seance.id} className="flex items-center gap-3 px-4 md:px-5 py-3">
@@ -464,7 +508,7 @@ export default function ClientDetail() {
 
       {/* Modal forfait */}
       {showForfaitForm && (
-        <Modal title={forfait ? 'Modifier le forfait' : 'Créer un forfait'} onClose={() => setShowForfaitForm(false)}>
+        <Modal title={forfaitEdite ? 'Modifier le forfait' : 'Nouveau forfait'} onClose={() => { setShowForfaitForm(false); setForfaitEdite(null) }}>
           <div className="flex flex-col gap-4">
             <div>
               <label className="block text-sm font-medium text-ink2 mb-1">Nombre de séances *</label>
@@ -496,7 +540,7 @@ export default function ClientDetail() {
               />
             </div>
             <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setShowForfaitForm(false)} className="px-4 py-2 text-sm text-muted">Annuler</button>
+              <button onClick={() => { setShowForfaitForm(false); setForfaitEdite(null) }} className="px-4 py-2 text-sm text-muted">Annuler</button>
               <button
                 onClick={handleSaveForfait}
                 disabled={!forfaitForm.nb_seances}
@@ -511,10 +555,13 @@ export default function ClientDetail() {
 
       {/* Confirmation suppression forfait */}
       {confirmDeleteForfait && (
-        <Modal title="Supprimer ce forfait ?" onClose={() => setConfirmDeleteForfait(false)}>
-          <p className="text-muted text-sm mb-4">Le forfait sera supprimé. Les séances associées ne seront plus liées à un forfait.</p>
+        <Modal title="Supprimer ce forfait ?" onClose={() => setConfirmDeleteForfait(null)}>
+          <p className="text-muted text-sm mb-2">
+            Ses {confirmDeleteForfait.utilisees} séance{confirmDeleteForfait.utilisees > 1 ? 's' : ''} déjà réalisée{confirmDeleteForfait.utilisees > 1 ? 's' : ''} redeviendront dues au tarif de la séance, et le prix du forfait sortira du chiffre d'affaires.
+          </p>
+          <p className="text-faint text-xs mb-4">Pour vendre un nouveau forfait, inutile de supprimer celui-ci : crée-le simplement une fois celui-ci terminé.</p>
           <div className="flex justify-end gap-3">
-            <button onClick={() => setConfirmDeleteForfait(false)} className="px-4 py-2 text-sm text-muted">Annuler</button>
+            <button onClick={() => setConfirmDeleteForfait(null)} className="px-4 py-2 text-sm text-muted">Annuler</button>
             <button onClick={handleDeleteForfait} className="px-4 py-2 bg-late text-late-ink text-sm rounded-lg hover:bg-late2">Supprimer</button>
           </div>
         </Modal>

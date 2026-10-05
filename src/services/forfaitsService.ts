@@ -1,16 +1,39 @@
 import { supabase } from '@/lib/supabase'
 import type { Client, Forfait, SeanceStatus } from '@/types'
 
+export interface ForfaitAvecUsage extends Forfait {
+  utilisees: number
+  restantes: number
+}
+
+// Nombre de séances réalisées rattachées à chacun de ces forfaits
+async function compterUtilisees(forfaitIds: string[]): Promise<Record<string, number>> {
+  if (forfaitIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from('seances')
+    .select('forfait_id')
+    .in('forfait_id', forfaitIds)
+    .eq('statut_seance', 'done')
+  if (error) throw error
+  const nb: Record<string, number> = {}
+  for (const s of data ?? []) nb[s.forfait_id] = (nb[s.forfait_id] ?? 0) + 1
+  return nb
+}
+
 export const forfaitsService = {
-  async getByClient(clientId: string) {
-    const { data } = await supabase
+  // Tous les forfaits d'un client, du plus récent au plus ancien, avec leur consommation.
+  // Un client peut en enchaîner plusieurs : les anciens restent, ils portent l'historique.
+  async getByClient(clientId: string): Promise<ForfaitAvecUsage[]> {
+    const { data, error } = await supabase
       .from('forfaits')
       .select('*')
       .eq('client_id', clientId)
+      .order('date_achat', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-    return data as Forfait | null
+    if (error) throw error
+    const forfaits = (data ?? []) as Forfait[]
+    const nb = await compterUtilisees(forfaits.map(f => f.id))
+    return forfaits.map(f => ({ ...f, utilisees: nb[f.id] ?? 0, restantes: f.nb_seances - (nb[f.id] ?? 0) }))
   },
 
   async create(forfait: Omit<Forfait, 'id' | 'created_at'>) {
@@ -70,30 +93,23 @@ export const forfaitsService = {
     }))
   },
 
-  // Forfait le plus récent de chaque client, avec le nombre de séances restantes
+  // Forfait à consommer pour chaque client : le plus ancien qui a encore des séances.
+  // Un client peut avoir plusieurs forfaits ; on vide le plus ancien d'abord.
   async getRestantsParClient() {
-    const { data: forfaits } = await supabase
+    const { data, error } = await supabase
       .from('forfaits')
       .select('*')
-      .order('created_at', { ascending: false })
-    const derniers: Record<string, Forfait> = {}
-    for (const f of forfaits ?? []) {
-      if (!derniers[f.client_id]) derniers[f.client_id] = f
-    }
-    const ids = Object.values(derniers).map(f => f.id)
-    if (ids.length === 0) return {}
-
-    const { data: utilisees } = await supabase
-      .from('seances')
-      .select('forfait_id')
-      .in('forfait_id', ids)
-      .eq('statut_seance', 'done')
-    const nbUtilisees: Record<string, number> = {}
-    for (const s of utilisees ?? []) nbUtilisees[s.forfait_id] = (nbUtilisees[s.forfait_id] ?? 0) + 1
+      .order('date_achat', { ascending: true })
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    const forfaits = (data ?? []) as Forfait[]
+    const nbUtilisees = await compterUtilisees(forfaits.map(f => f.id))
 
     const restants: Record<string, { forfaitId: string; restantes: number }> = {}
-    for (const [clientId, f] of Object.entries(derniers)) {
-      restants[clientId] = { forfaitId: f.id, restantes: f.nb_seances - (nbUtilisees[f.id] ?? 0) }
+    for (const f of forfaits) {
+      if (restants[f.client_id]) continue
+      const restantes = f.nb_seances - (nbUtilisees[f.id] ?? 0)
+      if (restantes > 0) restants[f.client_id] = { forfaitId: f.id, restantes }
     }
     return restants
   },
